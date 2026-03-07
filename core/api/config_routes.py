@@ -47,11 +47,25 @@ def create_config_router() -> APIRouter:
         for i, g in enumerate(config):
             if not isinstance(g, dict):
                 raise HTTPException(status_code=400, detail=f"第 {i + 1} 项应为对象")
-            for k in ("proxy_host", "proxy_user", "proxy_pass", "fingerprint_id"):
-                if k not in g:
-                    raise HTTPException(
-                        status_code=400, detail=f"代理组 {i + 1} 缺少字段: {k}"
-                    )
+            if "fingerprint_id" not in g:
+                raise HTTPException(
+                    status_code=400, detail=f"代理组 {i + 1} 缺少字段: fingerprint_id"
+                )
+            use_proxy = g.get("use_proxy", True)
+            if isinstance(use_proxy, str):
+                use_proxy = use_proxy.strip().lower() not in {
+                    "0",
+                    "false",
+                    "no",
+                    "off",
+                }
+            else:
+                use_proxy = bool(use_proxy)
+            if use_proxy and not str(g.get("proxy_host", "")).strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"代理组 {i + 1} 启用了代理，需填写 proxy_host",
+                )
             accounts = g.get("accounts", [])
             if not accounts:
                 raise HTTPException(

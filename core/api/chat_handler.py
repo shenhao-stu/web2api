@@ -59,6 +59,7 @@ def _proxy_key_for_group(group: ProxyGroupConfig) -> ProxyKey:
         group.proxy_host,
         group.proxy_user,
         group.fingerprint_id,
+        group.use_proxy,
         group.timezone or TIMEZONE,
     )
 

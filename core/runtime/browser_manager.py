@@ -156,16 +156,6 @@ class BrowserManager:
         port: int,
     ) -> subprocess.Popen[Any]:
         """启动 Chromium 进程（代理 + 扩展），使用指定 port。"""
-        from proxy_extension_builder import generate_proxy_auth_extension
-
-        extension_path = generate_proxy_auth_extension(
-            proxy_user=proxy_key.proxy_user,
-            proxy_pass=proxy_pass,
-            fingerprint_id=proxy_key.fingerprint_id,
-        )
-        if not Path(extension_path).is_dir():
-            raise RuntimeError(f"扩展目录不存在: {extension_path}")
-
         udd = user_data_dir(proxy_key.fingerprint_id)
         udd.mkdir(parents=True, exist_ok=True)
 
@@ -175,19 +165,33 @@ class BrowserManager:
         args = [
             self._chromium_bin,
             f"--remote-debugging-port={port}",
-            f"--load-extension={extension_path}",
             f"--fingerprint={proxy_key.fingerprint_id}",
             "--fingerprint-platform=windows",
             "--fingerprint-brand=Edge",
             f"--user-data-dir={udd}",
             f"--timezone={proxy_key.timezone or TIMEZONE}",
-            f"--proxy-server=http://{proxy_key.proxy_host}",
             "--force-webrtc-ip-handling-policy",
             "--webrtc-ip-handling-policy=disable_non_proxied_udp",
             "--disable-features=AsyncDNS",
             "--no-first-run",
             "--no-default-browser-check",
         ]
+        if proxy_key.use_proxy:
+            from proxy_extension_builder import generate_proxy_auth_extension
+
+            extension_path = generate_proxy_auth_extension(
+                proxy_user=proxy_key.proxy_user,
+                proxy_pass=proxy_pass,
+                fingerprint_id=proxy_key.fingerprint_id,
+            )
+            if not Path(extension_path).is_dir():
+                raise RuntimeError(f"扩展目录不存在: {extension_path}")
+            args.extend(
+                [
+                    f"--load-extension={extension_path}",
+                    f"--proxy-server=http://{proxy_key.proxy_host}",
+                ]
+            )
         if self._headless:
             args.extend(
                 [
@@ -241,9 +245,10 @@ class BrowserManager:
         port = self._available_ports.pop()
         proc = self._launch_process(proxy_key, proxy_pass, port)
         logger.info(
-            "已启动 Chromium PID=%s port=%s headless=%s no_sandbox=%s disable_gpu=%s disable_gpu_sandbox=%s，等待 CDP 就绪...",
+            "已启动 Chromium PID=%s port=%s mode=%s headless=%s no_sandbox=%s disable_gpu=%s disable_gpu_sandbox=%s，等待 CDP 就绪...",
             proc.pid,
             port,
+            "proxy" if proxy_key.use_proxy else "direct",
             self._headless,
             self._no_sandbox,
             self._disable_gpu,
@@ -314,7 +319,8 @@ class BrowserManager:
         entry.tabs[type_name] = tab
         entry.last_used_at = time.time()
         logger.info(
-            "[tab] opened proxy=%s type=%s account=%s",
+            "[tab] opened mode=%s proxy=%s type=%s account=%s",
+            "proxy" if proxy_key.use_proxy else "direct",
             proxy_key.fingerprint_id,
             type_name,
             account_id,
@@ -354,7 +360,8 @@ class BrowserManager:
         tab.sessions.clear()
         entry.last_used_at = time.time()
         logger.info(
-            "[tab] switched account proxy=%s type=%s account=%s",
+            "[tab] switched account mode=%s proxy=%s type=%s account=%s",
+            "proxy" if proxy_key.use_proxy else "direct",
             proxy_key.fingerprint_id,
             type_name,
             account_id,
@@ -474,7 +481,12 @@ class BrowserManager:
         except Exception:
             pass
         entry.last_used_at = time.time()
-        logger.info("[tab] closed proxy=%s type=%s", proxy_key.fingerprint_id, type_name)
+        logger.info(
+            "[tab] closed mode=%s proxy=%s type=%s",
+            "proxy" if proxy_key.use_proxy else "direct",
+            proxy_key.fingerprint_id,
+            type_name,
+        )
         return ClosedTabInfo(
             proxy_key=proxy_key,
             type_name=type_name,
@@ -520,7 +532,11 @@ class BrowserManager:
             logger.warning("关闭浏览器进程时异常: %s", e)
         self._available_ports.add(entry.port)
         del self._entries[proxy_key]
-        logger.info("[browser] closed proxy=%s", proxy_key.fingerprint_id)
+        logger.info(
+            "[browser] closed mode=%s proxy=%s",
+            "proxy" if proxy_key.use_proxy else "direct",
+            proxy_key.fingerprint_id,
+        )
         return closed_tabs
 
     async def collect_idle_browsers(

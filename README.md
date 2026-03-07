@@ -231,7 +231,7 @@ uv python run main.py
 Uvicorn running on http://127.0.0.1:9000
 ```
 
-### 5. 打开配置页，填入代理和账号
+### 5. 打开配置页，填入网络和账号
 
 浏览器访问：
 
@@ -241,13 +241,23 @@ http://127.0.0.1:9000/config
 
 在里面填：
 
-- `proxy_host`
-- `proxy_user`
-- `proxy_pass`
 - `fingerprint_id`
 - 账号 `name`
 - 账号 `type=claude`
 - 账号 `auth.sessionKey`
+
+如果你需要代理：
+
+- 勾选“使用代理”
+- 填 `proxy_host`
+- 按需填 `proxy_user`
+- 按需填 `proxy_pass`
+
+如果你本身就在可用地区、自用且不需要切 IP：
+
+- 取消“使用代理”
+- 这时浏览器会走当前机器的直连出口
+- 但最终是否可用，仍取决于你机器本身的出口地区和风控情况
 
 保存后立即生效。
 

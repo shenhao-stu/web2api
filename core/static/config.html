@@ -216,6 +216,27 @@
         color: var(--text-muted);
         margin-bottom: 16px;
       }
+      .hint {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        color: #d1d5db;
+        font-size: 13px;
+      }
+      .hint strong {
+        color: #f9fafb;
+      }
+      .warn {
+        background: #3f1600;
+        border: 1px solid #7c2d12;
+        color: #fed7aa;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
       .group-header {
         cursor: pointer;
         user-select: none;
@@ -255,6 +276,10 @@
     <div class="search-row">
       <label>搜索（代理 host/user 或账号 name / type）</label>
       <input type="text" id="search" placeholder="输入关键词筛选..." />
+    </div>
+    <div class="hint">
+      <strong>网络模式说明：</strong>勾选“使用代理”表示浏览器通过代理出口访问；取消勾选表示直连，直接使用当前机器自身 IP。
+      直连模式下不要在同一个组里配置大量账号，否则站点很容易识别为“同一 IP 下多个账号”，导致风控甚至封 IP。
     </div>
     <div class="stats" id="stats"></div>
     <div id="list"></div>
@@ -471,6 +496,7 @@
         opts
       ) {
         const key = (k, def = '') => (group[k] != null && group[k] !== '' ? group[k] : def)
+        const useProxy = group.use_proxy !== false
         const gkey = groupKey(group, groupIndex)
         const allAccounts = group.accounts || []
         const indices = opts.accountIndices || allAccounts.map((_, i) => i)
@@ -492,7 +518,7 @@
               <span class="chevron">▼</span>
               <span class="label">代理组 ${groupIndex + 1}</span>
               <span class="label" style="margin-left:8px;font-weight:400">${
-                group.proxy_host || '—'
+                useProxy ? group.proxy_host || '代理未填写' : '直连模式'
               } · ${allAccounts.length} 个账号</span>
             </span>
             <span onclick="event.stopPropagation()">
@@ -501,16 +527,28 @@
             </span>
           </h2>
           <div class="group-body">
+            ${
+              useProxy
+                ? ''
+                : `<div class="warn">当前为直连模式：浏览器直接使用这台机器的出口 IP。请勿在同一个直连组下堆很多账号，否则容易被识别为同一 IP 下多账号，导致账号关联或 IP 被封。</div>`
+            }
             <div class="row proxy-one-row">
+              <div>
+                <label>network_mode</label>
+                <label style="display:flex;align-items:center;gap:8px;height:38px;margin:0;color:var(--text)">
+                  <input type="checkbox" data-k="use_proxy" ${useProxy ? 'checked' : ''} style="width:auto" />
+                  <span>使用代理</span>
+                </label>
+              </div>
               <div><label>proxy_host</label><input type="text" data-k="proxy_host" value="${escapeAttr(
                 key('proxy_host')
-              )}" placeholder="sg.arxlabs.io:3010" /></div>
+              )}" placeholder="sg.arxlabs.io:3010" ${useProxy ? '' : 'disabled'} /></div>
               <div><label>proxy_user</label><input type="text" data-k="proxy_user" value="${escapeAttr(
                 key('proxy_user')
-              )}" placeholder="代理用户名" /></div>
+              )}" placeholder="代理用户名" ${useProxy ? '' : 'disabled'} /></div>
               <div><label>proxy_pass</label><input type="text" data-k="proxy_pass" value="${escapeAttr(
                 key('proxy_pass')
-              )}" placeholder="代理密码" /></div>
+              )}" placeholder="代理密码" ${useProxy ? '' : 'disabled'} /></div>
               <div><label>fingerprint_id</label><input type="text" data-k="fingerprint_id" value="${escapeAttr(
                 key('fingerprint_id')
               )}" placeholder="4567" /></div>
@@ -565,6 +603,9 @@
           const el = div.querySelector(`[data-k="${k}"]`)
           if (el) el.oninput = (e) => onGroupChange(groupIndex, k, e.target.value)
         })
+        const useProxyEl = div.querySelector('[data-k="use_proxy"]')
+        if (useProxyEl)
+          useProxyEl.onchange = (e) => onGroupChange(groupIndex, 'use_proxy', e.target.checked, true)
         const tzEl = div.querySelector('[data-k="timezone"]')
         if (tzEl) tzEl.onchange = (e) => onGroupChange(groupIndex, 'timezone', e.target.value)
         div.querySelector('[data-action="add-account"]').onclick = () => onAddAccount(groupIndex)
@@ -614,6 +655,7 @@
         const groups = []
         list.querySelectorAll('.group').forEach((groupEl) => {
           const g = {
+            use_proxy: !!groupEl.querySelector('[data-k="use_proxy"]')?.checked,
             proxy_host: groupEl.querySelector('[data-k="proxy_host"]')?.value?.trim() || '',
             proxy_user: groupEl.querySelector('[data-k="proxy_user"]')?.value?.trim() || '',
             proxy_pass: groupEl.querySelector('[data-k="proxy_pass"]')?.value?.trim() || '',
@@ -654,8 +696,9 @@
         function rerender() {
           render(config)
         }
-        function onGroupChange(gi, k, v) {
+        function onGroupChange(gi, k, v, shouldRerender = false) {
           if (config[gi]) config[gi][k] = v
+          if (shouldRerender) rerender()
         }
         function onAddAccount(gi) {
           if (!config[gi].accounts) config[gi].accounts = []
@@ -696,6 +739,7 @@
 
       document.getElementById('addGroup').onclick = () => {
         config.push({
+          use_proxy: true,
           proxy_host: '',
           proxy_user: '',
           proxy_pass: '',

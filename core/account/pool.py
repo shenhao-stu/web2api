@@ -79,7 +79,7 @@ class AccountPool:
         return None
 
     def get_group_by_proxy_key(self, proxy_key: ProxyKey) -> ProxyGroupConfig | None:
-        """根据 proxy_key（proxy_host, proxy_user, fingerprint_id, timezone）反查对应代理组。"""
+        """根据 proxy_key（proxy_host, proxy_user, fingerprint_id, use_proxy, timezone）反查对应代理组。"""
         pk_tz = getattr(proxy_key, "timezone", None) or TIMEZONE
         for g in self._groups:
             g_tz = g.timezone or TIMEZONE
@@ -87,6 +87,7 @@ class AccountPool:
                 g.proxy_host == proxy_key.proxy_host
                 and g.proxy_user == proxy_key.proxy_user
                 and g.fingerprint_id == proxy_key.fingerprint_id
+                and g.use_proxy == getattr(proxy_key, "use_proxy", True)
                 and g_tz == pk_tz
             ):
                 return g

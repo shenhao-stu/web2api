@@ -41,6 +41,7 @@ class ProxyGroupConfig:
     proxy_user: str
     proxy_pass: str
     fingerprint_id: str
+    use_proxy: bool = True
     timezone: str | None = None
     accounts: list[AccountConfig] = field(default_factory=list)
 

@@ -11,4 +11,5 @@ class ProxyKey(NamedTuple):
     proxy_host: str
     proxy_user: str
     fingerprint_id: str
+    use_proxy: bool = True
     timezone: str = TIMEZONE

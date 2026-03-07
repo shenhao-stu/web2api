@@ -29,6 +29,20 @@ def _get_conn() -> sqlite3.Connection:
     return sqlite3.connect(p)
 
 
+def _as_bool(value: Any, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
 def _init_tables(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -38,6 +52,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             proxy_user TEXT NOT NULL,
             proxy_pass TEXT NOT NULL,
             fingerprint_id TEXT NOT NULL DEFAULT '',
+            use_proxy INTEGER NOT NULL DEFAULT 1,
             timezone TEXT
         )
         """
@@ -61,6 +76,12 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     # 解冻时间戳：接口返回后写入，判断可用性时与当前时间比较
     try:
         conn.execute("ALTER TABLE account ADD COLUMN unfreeze_at INTEGER")
+    except sqlite3.OperationalError:
+        pass  # 列已存在（如升级后再次初始化）
+    try:
+        conn.execute(
+            "ALTER TABLE proxy_group ADD COLUMN use_proxy INTEGER NOT NULL DEFAULT 1"
+        )
     except sqlite3.OperationalError:
         pass  # 列已存在（如升级后再次初始化）
     conn.commit()
@@ -92,11 +113,19 @@ class ConfigRepository:
             groups: list[ProxyGroupConfig] = []
             for row in conn.execute(
                 """
-                SELECT id, proxy_host, proxy_user, proxy_pass, fingerprint_id, timezone
+                SELECT id, proxy_host, proxy_user, proxy_pass, fingerprint_id, use_proxy, timezone
                 FROM proxy_group ORDER BY id ASC
                 """
             ).fetchall():
-                gid, proxy_host, proxy_user, proxy_pass, fingerprint_id, timezone = row
+                (
+                    gid,
+                    proxy_host,
+                    proxy_user,
+                    proxy_pass,
+                    fingerprint_id,
+                    use_proxy,
+                    timezone,
+                ) = row
                 accounts: list[AccountConfig] = []
                 for acc_row in conn.execute(
                     "SELECT name, type, auth, unfreeze_at FROM account WHERE proxy_group_id = ? ORDER BY id ASC",
@@ -119,6 +148,7 @@ class ConfigRepository:
                         proxy_user=proxy_user,
                         proxy_pass=proxy_pass,
                         fingerprint_id=fingerprint_id or "",
+                        use_proxy=bool(use_proxy),
                         timezone=timezone,
                         accounts=accounts,
                     )
@@ -137,14 +167,15 @@ class ConfigRepository:
             for g in groups:
                 cur = conn.execute(
                     """
-                    INSERT INTO proxy_group (proxy_host, proxy_user, proxy_pass, fingerprint_id, timezone)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO proxy_group (proxy_host, proxy_user, proxy_pass, fingerprint_id, use_proxy, timezone)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         g.proxy_host,
                         g.proxy_user,
                         g.proxy_pass,
                         g.fingerprint_id,
+                        1 if g.use_proxy else 0,
                         g.timezone,
                     ),
                 )
@@ -170,6 +201,7 @@ class ConfigRepository:
                 "proxy_user": g.proxy_user,
                 "proxy_pass": g.proxy_pass,
                 "fingerprint_id": g.fingerprint_id,
+                "use_proxy": g.use_proxy,
                 "timezone": g.timezone,
                 "accounts": [
                     {
@@ -249,6 +281,7 @@ def _raw_to_groups(raw: list[dict[str, Any]]) -> list[ProxyGroupConfig]:
                 proxy_user=str(g.get("proxy_user", "")),
                 proxy_pass=str(g.get("proxy_pass", "")),
                 fingerprint_id=str(g.get("fingerprint_id", "")),
+                use_proxy=_as_bool(g.get("use_proxy", True), True),
                 timezone=g.get("timezone"),
                 accounts=accounts,
             )
