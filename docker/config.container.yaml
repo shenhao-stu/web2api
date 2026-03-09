@@ -35,7 +35,7 @@ scheduler:
   tab_max_concurrent: 5
   browser_gc_interval_seconds: 300
   tab_idle_seconds: 900
-  resident_browser_count: 0
+  resident_browser_count: 1
 
 claude:
   start_url: ''

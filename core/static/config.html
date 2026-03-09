@@ -115,7 +115,7 @@
         margin-bottom: 12px;
       }
       .row.proxy-one-row {
-        grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
+        grid-template-columns: 1fr 2fr 5fr 2fr 1fr 2fr;
         gap: 10px;
       }
       @media (max-width: 900px) {
@@ -279,8 +279,10 @@
       <input type="text" id="search" placeholder="输入关键词筛选..." />
     </div>
     <div class="hint">
-      <strong>网络模式说明：</strong>勾选“使用代理”表示浏览器通过代理出口访问；取消勾选表示直连，直接使用当前机器自身 IP。
-      直连模式下不要在同一个组里配置大量账号，否则站点很容易识别为“同一 IP 下多个账号”，导致风控甚至封 IP。
+      <strong>网络模式说明：</strong
+      >勾选“使用代理”表示浏览器通过代理出口访问；取消勾选表示直连，直接使用当前机器自身 IP。
+      直连模式下不要在同一个组里配置大量账号，否则站点很容易识别为“同一 IP
+      下多个账号”，导致风控甚至封 IP。
     </div>
     <div class="stats" id="stats"></div>
     <div id="list"></div>
@@ -546,7 +548,9 @@
               <div>
                 <label>network_mode</label>
                 <label style="display:flex;align-items:center;gap:8px;height:38px;margin:0;color:var(--text)">
-                  <input type="checkbox" data-k="use_proxy" ${useProxy ? 'checked' : ''} style="width:auto" />
+                  <input type="checkbox" data-k="use_proxy" ${
+                    useProxy ? 'checked' : ''
+                  } style="width:auto" />
                   <span>使用代理</span>
                 </label>
               </div>
@@ -615,7 +619,8 @@
         })
         const useProxyEl = div.querySelector('[data-k="use_proxy"]')
         if (useProxyEl)
-          useProxyEl.onchange = (e) => onGroupChange(groupIndex, 'use_proxy', e.target.checked, true)
+          useProxyEl.onchange = (e) =>
+            onGroupChange(groupIndex, 'use_proxy', e.target.checked, true)
         const tzEl = div.querySelector('[data-k="timezone"]')
         if (tzEl) tzEl.onchange = (e) => onGroupChange(groupIndex, 'timezone', e.target.value)
         div.querySelector('[data-action="add-account"]').onclick = () => onAddAccount(groupIndex)
