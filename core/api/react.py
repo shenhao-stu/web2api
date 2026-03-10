@@ -13,7 +13,7 @@ from core.api.function_call import format_tools_for_prompt
 # 固定 ReAct 提示词（借鉴 Dify ReAct 结构与表述，保持行式格式以兼容 parse_react_output）
 REACT_PROMPT_FIXED = r"""Respond to the human as helpfully and accurately as possible.
 
-You have access to the following tools (listed below under "## 可用工具").
+You have access to the following tools (listed below under "## Available tools").
 
 Use the following format:
 
@@ -29,9 +29,8 @@ Final Answer: your final response to the human
 Provide only ONE action per response. Valid "Action" values: a tool name from the list, or (when done) output "Final Answer" / "最终答案" instead of Action + Action Input.
 
 Rules:
-- 使用中文回答（Thought、Final Answer / Final Answer 等均用中文）。
 - After "Action Input: {...}" you must STOP and wait for Observation. Do not add any text, code, or explanation after the JSON line.
-- Action Input must be a single-line valid JSON. Do not output "Observation" yourself.
+- Action Input must be a single-line valid JSON. All double quotes `"` in JSON values must be escaped as `\"`. Do not output "Observation" yourself.
 - Format is: Thought → Action → Action Input (or Final Answer when done). Then the system replies with Observation.
 
 Begin. Always respond with a valid Thought then Action then Action Input (or Final Answer). Use tools when necessary; respond with Final Answer when appropriate.
@@ -45,7 +44,7 @@ def format_react_prompt(
     """用固定 ReAct 提示词构建系统前缀，并拼接可用工具列表。"""
     if tools_text is None:
         tools_text = format_tools_for_prompt(tools)
-    return REACT_PROMPT_FIXED + "\n\n---\n\n## 可用工具\n\n" + tools_text + "\n"
+    return REACT_PROMPT_FIXED + "\n\n---\n\n## Available tools\n\n" + tools_text + "\n"
 
 
 def parse_react_output(text: str) -> dict[str, Any] | None:

@@ -1,47 +1,64 @@
+# Server configuration
 server:
+  # Host address to bind the server (0.0.0.0 listens on all interfaces)
   host: '0.0.0.0'
+  # Port the server listens on
   port: 9000
 
 auth:
-  # 留空表示不启用 API Key；如果填写，所有 /{type}/v1/* 请求都要带匹配的 Key。
-  # 支持单个字符串、逗号分隔字符串或 YAML 列表。
+  # Leave empty to disable API key authentication.
+  # If set, all /{type}/v1/* requests must include a matching key.
+  # Supports a single string, comma-separated string, or YAML list.
   api_key: ''
 
-  # 留空表示不启用配置页；填写明文后，首次启动会自动转换成哈希并回写到 /data/config.yaml。
+  # Leave empty to disable the config page.
+  # If set in plain text, it will be automatically hashed and written back to /data/config.yaml on first start.
   config_secret: ''
+  # Maximum number of failed login attempts before locking
   config_login_max_failures: 5
+  # Duration in seconds to lock the config page after too many failed attempts
   config_login_lock_seconds: 600
 
 browser:
-  # 容器内 fingerprint-chromium 的固定路径
+  # Fixed path to fingerprint-chromium inside the container
   chromium_bin: '/opt/fingerprint-chromium/chrome'
 
-  # Claude 不建议 headless，默认继续使用 Xvfb 虚拟显示
+  # Headless mode is not recommended for Claude; Xvfb virtual display is used by default
   headless: false
 
-  # 容器内默认关闭 sandbox，避免 Chromium 因容器权限限制无法启动
+  # Disable sandbox inside containers to prevent Chromium startup failures due to permission restrictions
   no_sandbox: true
 
-  # 容器环境通常没有可用 GPU，建议显式关闭
+  # GPU is typically unavailable in container environments; explicitly disable it
   disable_gpu: true
 
-  # 某些容器环境里 GPU sandbox 也可能导致额外问题
+  # GPU sandbox can also cause issues in some container environments
   disable_gpu_sandbox: true
 
+  # Starting port number for CDP (Chrome DevTools Protocol) connections
   cdp_port_start: 9222
+  # Number of CDP ports available
   cdp_port_count: 20
 
 scheduler:
+  # Maximum number of tabs allowed to run concurrently
   tab_max_concurrent: 5
+  # Interval in seconds for browser garbage collection
   browser_gc_interval_seconds: 300
+  # Seconds of inactivity before a tab is considered idle
   tab_idle_seconds: 900
+  # Number of browser instances to keep resident (pre-warmed)
   resident_browser_count: 1
 
 claude:
+  # URL to open when starting Claude (leave empty for default)
   start_url: ''
+  # Custom API base URL (leave empty to use the default endpoint)
   api_base: ''
+  # Model name mapping: alias -> actual model identifier
   model_mapping:
     s4: claude-sonnet-4-5-20250929
 
 mock:
+  # Port for the mock server
   port: 8002
