@@ -28,9 +28,7 @@ Web2API 是一个**桥接服务**：把网页端的 AI 服务（当前主要是 
 
 ## 快速开始
 
-### Docker 启动（Linux 推荐）
-
-> ⚠️ M 芯片 macOS 无法使用 Docker 启动，请选择源码启动
+### Docker
 
 **从源码构建：**
 
@@ -47,7 +45,7 @@ docker compose up -d --build
 mkdir web2api && cd web2api
 mkdir -p docker-data && curl -sL -o docker-data/config.yaml https://raw.githubusercontent.com/caiwuu/web2api/master/docker/config.container.yaml
 # 修改 docker-data/config.yaml
-docker run -d --name web2api --restart unless-stopped --platform linux/amd64 --shm-size=1g \
+docker run -d --name web2api --restart unless-stopped --shm-size=1g \
   -p 9000:9000 -v "$(pwd)/docker-data:/data" ghcr.io/caiwuu/web2api:latest
 ```
 

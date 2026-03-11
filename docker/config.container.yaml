@@ -40,6 +40,13 @@ browser:
   # Number of CDP ports available
   cdp_port_count: 20
 
+  # CDP readiness wait settings (tune for slow/cold starts in Docker)
+  # Total wait time ≈ cdp_wait_max_attempts * cdp_wait_interval_seconds
+  cdp_wait_max_attempts: 60
+  cdp_wait_interval_seconds: 2.0
+  # Per-attempt TCP connect timeout when probing the CDP port
+  cdp_wait_connect_timeout_seconds: 2.0
+
 scheduler:
   # Maximum number of tabs allowed to run concurrently
   tab_max_concurrent: 5

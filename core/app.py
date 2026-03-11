@@ -51,6 +51,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     no_sandbox = get_bool("browser", "no_sandbox", False)
     disable_gpu = get_bool("browser", "disable_gpu", False)
     disable_gpu_sandbox = get_bool("browser", "disable_gpu_sandbox", False)
+    cdp_wait_max_attempts = int(get("browser", "cdp_wait_max_attempts") or 90)
+    cdp_wait_interval_seconds = float(
+        get("browser", "cdp_wait_interval_seconds") or 2.0
+    )
+    cdp_wait_connect_timeout_seconds = float(
+        get("browser", "cdp_wait_connect_timeout_seconds") or 2.0
+    )
     port_start = int(get("browser", "cdp_port_start") or 9223)
     port_count = int(get("browser", "cdp_port_count") or 20)
     port_range = (
@@ -68,6 +75,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         disable_gpu=disable_gpu,
         disable_gpu_sandbox=disable_gpu_sandbox,
         port_range=port_range,
+        cdp_wait_max_attempts=cdp_wait_max_attempts,
+        cdp_wait_interval_seconds=cdp_wait_interval_seconds,
+        cdp_wait_connect_timeout_seconds=cdp_wait_connect_timeout_seconds,
     )
     app.state.chat_handler = ChatHandler(
         pool=pool,

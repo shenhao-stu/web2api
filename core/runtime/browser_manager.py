@@ -35,13 +35,14 @@ ApplyAuthFn = Callable[[BrowserContext, Page], Coroutine[Any, Any, None]]
 async def _wait_for_cdp(
     host: str,
     port: int,
-    max_attempts: int = 30,
-    interval: float = 1.0,
+    max_attempts: int = 60,
+    interval: float = 2.0,
+    connect_timeout: float = 2.0,
 ) -> bool:
     for _ in range(max_attempts):
         try:
             _, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port), timeout=2.0
+                asyncio.open_connection(host, port), timeout=connect_timeout
             )
             writer.close()
             await writer.wait_closed()
@@ -111,6 +112,9 @@ class BrowserManager:
         disable_gpu: bool = False,
         disable_gpu_sandbox: bool = False,
         port_range: list[int] | None = None,
+        cdp_wait_max_attempts: int = 90,
+        cdp_wait_interval_seconds: float = 2.0,
+        cdp_wait_connect_timeout_seconds: float = 2.0,
     ) -> None:
         self._chromium_bin = chromium_bin
         self._headless = headless
@@ -121,6 +125,11 @@ class BrowserManager:
         self._entries: dict[ProxyKey, BrowserEntry] = {}
         self._available_ports: set[int] = set(self._port_range)
         self._playwright: Any = None
+        self._cdp_wait_max_attempts = max(1, int(cdp_wait_max_attempts))
+        self._cdp_wait_interval_seconds = max(0.05, float(cdp_wait_interval_seconds))
+        self._cdp_wait_connect_timeout_seconds = max(
+            0.2, float(cdp_wait_connect_timeout_seconds)
+        )
 
     def _stderr_log_path(self, proxy_key: ProxyKey, port: int) -> Path:
         log_dir = Path(tempfile.gettempdir()) / "web2api-browser-logs"
@@ -291,7 +300,13 @@ class BrowserManager:
             self._disable_gpu,
             self._disable_gpu_sandbox,
         )
-        ok = await _wait_for_cdp("127.0.0.1", port)
+        ok = await _wait_for_cdp(
+            "127.0.0.1",
+            port,
+            max_attempts=self._cdp_wait_max_attempts,
+            interval=self._cdp_wait_interval_seconds,
+            connect_timeout=self._cdp_wait_connect_timeout_seconds,
+        )
         if not ok:
             self._available_ports.add(port)
             try:
