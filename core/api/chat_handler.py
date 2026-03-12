@@ -204,6 +204,22 @@ class ChatHandler:
         )
         self.reload_pool(self._config_repo.load_groups())
 
+    def get_account_runtime_status(self) -> dict[str, dict[str, Any]]:
+        """返回当前账号运行时状态，供配置页展示角标。"""
+        status: dict[str, dict[str, Any]] = {}
+        for proxy_key, entry in self._browser_manager.list_browser_entries():
+            for type_name, tab in entry.tabs.items():
+                status[tab.account_id] = {
+                    "fingerprint_id": proxy_key.fingerprint_id,
+                    "type": type_name,
+                    "is_active": True,
+                    "tab_state": tab.state,
+                    "accepting_new": tab.accepting_new,
+                    "active_requests": tab.active_requests,
+                    "frozen_until": tab.frozen_until,
+                }
+        return status
+
     def _make_apply_auth_fn(
         self,
         plugin: Any,
@@ -233,11 +249,21 @@ class ChatHandler:
             for type_name in list(entry.tabs.keys()):
                 tab = entry.tabs[type_name]
                 pair = self._pool.get_account_by_id(tab.account_id)
-                if pair is None or pair[0] is not group or pair[1].type != type_name:
+                if (
+                    pair is None
+                    or pair[0] is not group
+                    or pair[1].type != type_name
+                    or not pair[1].enabled
+                ):
                     self._invalidate_tab_sessions_locked(proxy_key, type_name)
-                    closed = await self._browser_manager.close_tab(proxy_key, type_name)
-                    if closed is not None:
-                        self._apply_closed_tabs_locked([closed])
+                    if tab.active_requests == 0:
+                        closed = await self._browser_manager.close_tab(
+                            proxy_key, type_name
+                        )
+                        if closed is not None:
+                            self._apply_closed_tabs_locked([closed])
+                    else:
+                        self._browser_manager.mark_tab_draining(proxy_key, type_name)
 
     def _invalidate_session_locked(
         self,

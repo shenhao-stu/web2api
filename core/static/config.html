@@ -166,10 +166,44 @@
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 12px;
+        padding-top: 44px;
         margin-bottom: 8px;
         display: flex;
         flex-direction: column;
         gap: 12px;
+        position: relative;
+      }
+      .account-status-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid transparent;
+      }
+      .account-status-badge.active {
+        background: #14532d;
+        color: #bbf7d0;
+        border-color: #166534;
+      }
+      .account-status-badge.frozen {
+        background: #7f1d1d;
+        color: #fecaca;
+        border-color: #991b1b;
+      }
+      .account-status-badge.disabled {
+        background: #27272a;
+        color: #d4d4d8;
+        border-color: #3f3f46;
+      }
+      .account-status-badge.idle {
+        background: #1f2937;
+        color: #cbd5e1;
+        border-color: #334155;
       }
       .account .account-row1 {
         display: flex;
@@ -187,6 +221,12 @@
       .account .account-row1 .f.type {
         min-width: 120px;
       }
+      .account .account-row1 .f.enabled {
+        min-width: 110px;
+      }
+      .account .account-row1 .f.freeze-time {
+        min-width: 220px;
+      }
       .account .account-row2 {
         width: 100%;
       }
@@ -201,6 +241,22 @@
       .account .f select {
         padding: 6px 10px;
         font-size: 13px;
+      }
+      .account .f input[readonly] {
+        color: var(--text-muted);
+        cursor: default;
+      }
+      .account .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        color: var(--text);
+        margin: 0;
+      }
+      .account .toggle input {
+        width: auto;
+        margin: 0;
       }
       .account .actions {
         flex-shrink: 0;
@@ -292,8 +348,11 @@
 
     <script>
       const API = '/api/config'
+      const STATUS_API = '/api/config/status'
       const TYPES_API = '/api/types'
       let registeredTypes = ['claude']
+      let runtimeStatus = {}
+      let runtimeNow = null
 
       // 全球时区列表：优先使用 Intl.supportedValuesOf，否则用静态列表
       const TIMEZONES = (() => {
@@ -393,6 +452,12 @@
         return res.json()
       }
 
+      async function loadStatus() {
+        const res = await apiFetch(STATUS_API)
+        if (!res.ok) throw new Error(await res.text())
+        return res.json()
+      }
+
       function escapeAttr(s) {
         if (s == null) return ''
         return String(s)
@@ -421,6 +486,50 @@
         }
       }
 
+      function asUnix(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+        if (typeof value === 'string' && value.trim()) {
+          const n = Number(value)
+          if (Number.isFinite(n)) return Math.trunc(n)
+        }
+        return null
+      }
+
+      function formatDateTime(value) {
+        const ts = asUnix(value)
+        if (ts == null || ts <= 0) return '-'
+        try {
+          return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false })
+        } catch (_) {
+          return String(ts)
+        }
+      }
+
+      function applyRuntimeStatus(payload) {
+        runtimeStatus = (payload && payload.accounts) || {}
+        runtimeNow =
+          payload && typeof payload.now === 'number' ? payload.now : Math.trunc(Date.now() / 1000)
+      }
+
+      function accountId(group, acc) {
+        return `${group.fingerprint_id || ''}:${acc.name || ''}`
+      }
+
+      function getAccountBadge(group, acc) {
+        const enabled = acc.enabled !== false
+        const runtime = runtimeStatus[accountId(group, acc)] || null
+        const isActive = !!(runtime && runtime.is_active)
+        const unfreezeAt = asUnix(
+          runtime && runtime.unfreeze_at != null ? runtime.unfreeze_at : acc.unfreeze_at
+        )
+        const now = runtimeNow || Math.trunc(Date.now() / 1000)
+        const isFrozen = unfreezeAt != null && unfreezeAt > now
+        if (!enabled) return { className: 'disabled', text: '未启用' }
+        if (isActive) return { className: 'active', text: '使用中' }
+        if (isFrozen) return { className: 'frozen', text: '冻结中' }
+        return { className: 'idle', text: '空闲' }
+      }
+
       function renderAccount(acc, accIndex, group, onRemove, onChange) {
         const currentType = acc.type || 'claude'
         const typeOptions = registeredTypes.includes(currentType)
@@ -434,14 +543,27 @@
               )}</option>`
           )
           .join('')
+        const badge = getAccountBadge(group, acc)
         const div = document.createElement('div')
         div.className = 'account'
+        div.dataset.accountIndex = String(accIndex)
         div.innerHTML = `
+          <div class="account-status-badge ${badge.className}">${badge.text}</div>
           <div class="account-row1">
             <div class="f name"><label>name</label><input type="text" data-k="name" value="${escapeAttr(
               acc.name
             )}" placeholder="claude-01" /></div>
             <div class="f type"><label>type</label><select data-k="type">${selectOpts}</select></div>
+            <div class="f enabled">
+              <label>enabled</label>
+              <label class="toggle">
+                <input type="checkbox" data-k="enabled" ${acc.enabled !== false ? 'checked' : ''} />
+                <span>启用</span>
+              </label>
+            </div>
+            <div class="f freeze-time"><label>解冻时间</label><input type="text" data-k="unfreeze_at_display" value="${escapeAttr(
+              formatDateTime(acc.unfreeze_at)
+            )}" readonly /></div>
             <div class="actions"><button type="button" class="btn btn-danger btn-sm">Delete</button></div>
           </div>
           <div class="account-row2">
@@ -454,6 +576,8 @@
           onChange(accIndex, 'name', e.target.value)
         div.querySelector('[data-k="type"]').onchange = (e) =>
           onChange(accIndex, 'type', e.target.value)
+        div.querySelector('[data-k="enabled"]').onchange = (e) =>
+          onChange(accIndex, 'enabled', e.target.checked, true)
         div.querySelector('[data-k="auth"]').oninput = (e) =>
           onChange(accIndex, 'auth', e.target.value)
         div.querySelector('.btn-danger').onclick = () => onRemove(accIndex)
@@ -671,30 +795,60 @@
       }
 
       function getConfigFromForm() {
-        const list = document.getElementById('list')
-        const groups = []
-        list.querySelectorAll('.group').forEach((groupEl) => {
-          const g = {
-            use_proxy: !!groupEl.querySelector('[data-k="use_proxy"]')?.checked,
-            proxy_host: groupEl.querySelector('[data-k="proxy_host"]')?.value?.trim() || '',
-            proxy_user: groupEl.querySelector('[data-k="proxy_user"]')?.value?.trim() || '',
-            proxy_pass: groupEl.querySelector('[data-k="proxy_pass"]')?.value?.trim() || '',
-            fingerprint_id: groupEl.querySelector('[data-k="fingerprint_id"]')?.value?.trim() || '',
-            timezone: groupEl.querySelector('[data-k="timezone"]')?.value?.trim() || undefined,
-            accounts: [],
-          }
-          groupEl.querySelectorAll('.account').forEach((accEl) => {
-            const name = accEl.querySelector('[data-k="name"]')?.value?.trim()
-            const type = accEl.querySelector('[data-k="type"]')?.value?.trim() || 'claude'
-            const authStr = accEl.querySelector('[data-k="auth"]')?.value?.trim() || '{}'
-            if (name) g.accounts.push({ name, type, auth: parseAuth(authStr) })
-          })
-          if (g.accounts.length) groups.push(g)
-        })
-        return groups
+        return (config || [])
+          .map((group) => ({
+            use_proxy: group.use_proxy !== false,
+            proxy_host: (group.proxy_host || '').trim(),
+            proxy_user: (group.proxy_user || '').trim(),
+            proxy_pass: (group.proxy_pass || '').trim(),
+            fingerprint_id: (group.fingerprint_id || '').trim(),
+            timezone: (group.timezone || '').trim() || undefined,
+            accounts: (group.accounts || [])
+              .map((acc) => {
+                const name = (acc.name || '').trim()
+                if (!name) return null
+                const normalized = {
+                  name,
+                  type: (acc.type || 'claude').trim() || 'claude',
+                  auth: typeof acc.auth === 'string' ? parseAuth(acc.auth) : acc.auth || {},
+                  enabled: acc.enabled !== false,
+                }
+                const unfreezeAt = asUnix(acc.unfreeze_at)
+                if (unfreezeAt != null) normalized.unfreeze_at = unfreezeAt
+                return normalized
+              })
+              .filter(Boolean),
+          }))
+          .filter((group) => group.accounts.length)
       }
 
       let config = []
+
+      function updateAccountStatusBadges() {
+        document.querySelectorAll('.group').forEach((groupEl) => {
+          const groupIndex = Number(groupEl.dataset.groupIndex)
+          const group = config[groupIndex]
+          if (!group) return
+          groupEl.querySelectorAll('.account').forEach((accEl) => {
+            const accountIndex = Number(accEl.dataset.accountIndex)
+            const acc = (group.accounts || [])[accountIndex]
+            if (!acc) return
+            const badge = getAccountBadge(group, acc)
+            const badgeEl = accEl.querySelector('.account-status-badge')
+            if (badgeEl) {
+              badgeEl.className = `account-status-badge ${badge.className}`
+              badgeEl.textContent = badge.text
+            }
+            const unfreezeEl = accEl.querySelector('[data-k="unfreeze_at_display"]')
+            if (unfreezeEl) {
+              const runtime = runtimeStatus[accountId(group, acc)] || null
+              const value =
+                runtime && runtime.unfreeze_at != null ? runtime.unfreeze_at : acc.unfreeze_at
+              unfreezeEl.value = formatDateTime(value)
+            }
+          })
+        })
+      }
 
       function render(configData) {
         config = JSON.parse(JSON.stringify(configData))
@@ -722,7 +876,13 @@
         }
         function onAddAccount(gi) {
           if (!config[gi].accounts) config[gi].accounts = []
-          config[gi].accounts.push({ name: '', type: 'claude', auth: {} })
+          config[gi].accounts.push({
+            name: '',
+            type: 'claude',
+            auth: {},
+            enabled: true,
+            unfreeze_at: null,
+          })
           rerender()
         }
         function onRemoveAccount(gi, ai) {
@@ -733,6 +893,7 @@
           if (config[gi].accounts[ai]) {
             if (k === 'auth') config[gi].accounts[ai].auth = parseAuth(v)
             else config[gi].accounts[ai][k] = v
+            if (k === 'enabled') rerender()
           }
         }
         function onRemoveGroup(gi) {
@@ -755,6 +916,7 @@
             )
           )
         })
+        updateAccountStatusBadges()
       }
 
       document.getElementById('addGroup').onclick = () => {
@@ -765,7 +927,7 @@
           proxy_pass: '',
           fingerprint_id: '',
           timezone: 'America/Chicago',
-          accounts: [{ name: '', type: 'claude', auth: {} }],
+          accounts: [{ name: '', type: 'claude', auth: {}, enabled: true, unfreeze_at: null }],
         })
         render(config)
       }
@@ -773,7 +935,11 @@
       document.getElementById('load').onclick = async () => {
         try {
           await loadTypes()
-          const data = await loadConfig()
+          const [data, status] = await Promise.all([
+            loadConfig(),
+            loadStatus().catch(() => ({ accounts: {}, now: Math.trunc(Date.now() / 1000) })),
+          ])
+          applyRuntimeStatus(status)
           render(data)
           showMsg('已加载 / Loaded')
         } catch (e) {
@@ -799,7 +965,11 @@
           const text = await res.text()
           if (!res.ok) throw new Error(text || res.statusText)
           showMsg('保存成功并已生效 / Saved successfully and applied')
-          const cfg = await loadConfig()
+          const [cfg, status] = await Promise.all([
+            loadConfig(),
+            loadStatus().catch(() => ({ accounts: {}, now: Math.trunc(Date.now() / 1000) })),
+          ])
+          applyRuntimeStatus(status)
           render(cfg)
         } catch (e) {
           showMsg('保存失败 / Save failed: ' + e.message, 'error')
@@ -820,7 +990,11 @@
       ;(async () => {
         await loadTypes()
         try {
-          const data = await loadConfig()
+          const [data, status] = await Promise.all([
+            loadConfig(),
+            loadStatus().catch(() => ({ accounts: {}, now: Math.trunc(Date.now() / 1000) })),
+          ])
+          applyRuntimeStatus(status)
           render(data)
         } catch (e) {
           render([])
@@ -830,6 +1004,12 @@
           )
         }
       })()
+      setInterval(async () => {
+        try {
+          applyRuntimeStatus(await loadStatus())
+          updateAccountStatusBadges()
+        } catch (_) {}
+      }, 15000)
     </script>
   </body>
 </html>

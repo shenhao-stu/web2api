@@ -65,6 +65,7 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             auth TEXT NOT NULL DEFAULT '{}',
+            enabled INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY (proxy_group_id) REFERENCES proxy_group(id) ON DELETE CASCADE
         )
         """
@@ -76,6 +77,12 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     # 解冻时间戳：接口返回后写入，判断可用性时与当前时间比较
     try:
         conn.execute("ALTER TABLE account ADD COLUMN unfreeze_at INTEGER")
+    except sqlite3.OperationalError:
+        pass  # 列已存在（如升级后再次初始化）
+    try:
+        conn.execute(
+            "ALTER TABLE account ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"
+        )
     except sqlite3.OperationalError:
         pass  # 列已存在（如升级后再次初始化）
     try:
@@ -128,18 +135,27 @@ class ConfigRepository:
                 ) = row
                 accounts: list[AccountConfig] = []
                 for acc_row in conn.execute(
-                    "SELECT name, type, auth, unfreeze_at FROM account WHERE proxy_group_id = ? ORDER BY id ASC",
+                    "SELECT name, type, auth, enabled, unfreeze_at FROM account WHERE proxy_group_id = ? ORDER BY id ASC",
                     (gid,),
                 ).fetchall():
                     name, type_, auth_json = acc_row[0], acc_row[1], acc_row[2]
-                    unfreeze_at = (
-                        acc_row[3]
+                    enabled = (
+                        bool(acc_row[3])
                         if len(acc_row) > 3 and acc_row[3] is not None
+                        else True
+                    )
+                    unfreeze_at = (
+                        acc_row[4]
+                        if len(acc_row) > 4 and acc_row[4] is not None
                         else None
                     )
                     accounts.append(
                         account_from_row(
-                            name, type_, auth_json or "{}", unfreeze_at=unfreeze_at
+                            name,
+                            type_,
+                            auth_json or "{}",
+                            enabled=enabled,
+                            unfreeze_at=unfreeze_at,
                         )
                     )
                 groups.append(
@@ -183,10 +199,17 @@ class ConfigRepository:
                 for a in g.accounts:
                     conn.execute(
                         """
-                        INSERT INTO account (proxy_group_id, name, type, auth, unfreeze_at)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO account (proxy_group_id, name, type, auth, enabled, unfreeze_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        (gid, a.name, a.type, a.auth_json(), a.unfreeze_at),
+                        (
+                            gid,
+                            a.name,
+                            a.type,
+                            a.auth_json(),
+                            1 if a.enabled else 0,
+                            a.unfreeze_at,
+                        ),
                     )
             conn.commit()
         finally:
@@ -208,6 +231,7 @@ class ConfigRepository:
                         "name": a.name,
                         "type": a.type,
                         "auth": a.auth,
+                        "enabled": a.enabled,
                         "unfreeze_at": a.unfreeze_at,
                     }
                     for a in g.accounts
@@ -265,6 +289,7 @@ def _raw_to_groups(raw: list[dict[str, Any]]) -> list[ProxyGroupConfig]:
             else:
                 auth = {}
             if name:
+                enabled = _as_bool(a.get("enabled", True), True)
                 unfreeze_at = a.get("unfreeze_at")
                 if isinstance(unfreeze_at, (int, float)):
                     unfreeze_at = int(unfreeze_at)
@@ -272,7 +297,11 @@ def _raw_to_groups(raw: list[dict[str, Any]]) -> list[ProxyGroupConfig]:
                     unfreeze_at = None
                 accounts.append(
                     AccountConfig(
-                        name=name, type=type_, auth=auth, unfreeze_at=unfreeze_at
+                        name=name,
+                        type=type_,
+                        auth=auth,
+                        enabled=enabled,
+                        unfreeze_at=unfreeze_at,
                     )
                 )
         groups.append(

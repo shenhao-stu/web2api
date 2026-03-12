@@ -14,6 +14,7 @@ class AccountConfig:
     name: str
     type: str  # 如 claude, chatgpt, kimi
     auth: dict[str, Any]  # 由各插件定义 key，如 claude 用 sessionKey
+    enabled: bool = True
     unfreeze_at: int | None = (
         None  # Unix 时间戳，接口返回的解冻时间；None 或已过则视为可用
     )
@@ -25,7 +26,9 @@ class AccountConfig:
         return json.dumps(self.auth, ensure_ascii=False)
 
     def is_available(self) -> bool:
-        """当前时间 >= 解冻时间则可用（无解冻时间视为可用）。"""
+        """已启用且当前时间 >= 解冻时间则可用（无解冻时间视为可用）。"""
+        if not self.enabled:
+            return False
         if self.unfreeze_at is None:
             return True
         import time
@@ -54,6 +57,7 @@ def account_from_row(
     name: str,
     type: str,
     auth_json: str,
+    enabled: bool = True,
     unfreeze_at: int | None = None,
 ) -> AccountConfig:
     """从 DB 行构造 AccountConfig。"""
@@ -63,4 +67,10 @@ def account_from_row(
         auth = json.loads(auth_json) if auth_json else {}
     except Exception:
         auth = {}
-    return AccountConfig(name=name, type=type, auth=auth, unfreeze_at=unfreeze_at)
+    return AccountConfig(
+        name=name,
+        type=type,
+        auth=auth,
+        enabled=enabled,
+        unfreeze_at=unfreeze_at,
+    )

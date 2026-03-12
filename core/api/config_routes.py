@@ -3,6 +3,7 @@
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,38 @@ def create_config_router() -> APIRouter:
         if repo is None:
             raise HTTPException(status_code=503, detail="服务未就绪")
         return repo.load_raw()
+
+    @router.get("/api/config/status")
+    def get_config_status(
+        request: Request, _: None = Depends(require_config_login)
+    ) -> dict[str, Any]:
+        """返回配置页需要的账号运行时状态。"""
+        repo: ConfigRepository | None = getattr(request.app.state, "config_repo", None)
+        handler: ChatHandler | None = getattr(request.app.state, "chat_handler", None)
+        if repo is None or handler is None:
+            raise HTTPException(status_code=503, detail="服务未就绪")
+        runtime_status = handler.get_account_runtime_status()
+        now = int(time.time())
+        accounts: dict[str, dict[str, Any]] = {}
+        for group in repo.load_groups():
+            for account in group.accounts:
+                account_id = f"{group.fingerprint_id}:{account.name}"
+                runtime = runtime_status.get(account_id, {})
+                is_frozen = (
+                    account.unfreeze_at is not None and int(account.unfreeze_at) > now
+                )
+                accounts[account_id] = {
+                    "fingerprint_id": group.fingerprint_id,
+                    "account_name": account.name,
+                    "enabled": account.enabled,
+                    "unfreeze_at": account.unfreeze_at,
+                    "is_frozen": is_frozen,
+                    "is_active": bool(runtime.get("is_active")),
+                    "tab_state": runtime.get("tab_state"),
+                    "accepting_new": runtime.get("accepting_new"),
+                    "active_requests": runtime.get("active_requests", 0),
+                }
+        return {"now": now, "accounts": accounts}
 
     @router.put("/api/config")
     async def put_config(
@@ -101,6 +134,13 @@ def create_config_router() -> APIRouter:
                     raise HTTPException(
                         status_code=400,
                         detail=f"代理组 {i + 1} 账号 {j + 1} 需包含 type（如 claude）",
+                    )
+                if "enabled" in a and not isinstance(
+                    a.get("enabled"), (bool, int, str)
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"代理组 {i + 1} 账号 {j + 1} 的 enabled 类型无效",
                     )
         try:
             repo.save_raw(config)
