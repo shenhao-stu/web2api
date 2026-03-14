@@ -99,8 +99,10 @@ import subprocess
 import tomllib
 
 with open("/tmp/pyproject.toml", "rb") as f:
-    deps = tomllib.load(f)["project"]["dependencies"]
+    project = tomllib.load(f)["project"]
 
+extra_deps = project.get("optional-dependencies", {}).get("postgres", [])
+deps = [*project["dependencies"], *extra_deps]
 subprocess.check_call(["pip", "install", "--no-cache-dir", *deps])
 PY
 

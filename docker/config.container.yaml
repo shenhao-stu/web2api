@@ -2,7 +2,7 @@
 server:
   # Host address to bind the server (0.0.0.0 listens on all interfaces)
   host: '0.0.0.0'
-  # Port the server listens on
+  # Port the server listens on. In hosted environments, PORT / WEB2API_SERVER_PORT can override this.
   port: 9000
 
 auth:
@@ -12,7 +12,7 @@ auth:
   api_key: ''
 
   # Leave empty to disable the config page.
-  # If set in plain text, it will be automatically hashed and written back to /data/config.yaml on first start.
+  # See docs/config.md for file-backed vs hosted-mode behavior.
   config_secret: ''
   # Maximum number of failed login attempts before locking
   config_login_max_failures: 5

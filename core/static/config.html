@@ -1005,6 +1005,7 @@
         }
       })()
       setInterval(async () => {
+        if (document.hidden) return
         try {
           applyRuntimeStatus(await loadStatus())
           updateAccountStatusBadges()

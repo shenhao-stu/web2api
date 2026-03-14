@@ -197,13 +197,17 @@ class ChatHandler:
         account_name: str,
         unfreeze_at: int,
     ) -> None:
-        """记录账号解冻时间并重载池，使后续 acquire 按当前时间判断可用性。"""
+        """记录账号解冻时间，并同步更新内存账号池。"""
         if self._config_repo is None:
             return
         self._config_repo.update_account_unfreeze_at(
             fingerprint_id, account_name, unfreeze_at
         )
-        self.reload_pool(self._config_repo.load_groups())
+        self._pool.update_account_unfreeze_at(
+            fingerprint_id,
+            account_name,
+            unfreeze_at,
+        )
 
     def get_account_runtime_status(self) -> dict[str, dict[str, Any]]:
         """返回当前账号运行时状态，供配置页展示角标。"""

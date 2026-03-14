@@ -9,6 +9,7 @@
 - 在未打开浏览器的代理组中选择某个 type 的候选账号
 """
 
+from dataclasses import replace
 from typing import Iterator
 
 from core.config.schema import AccountConfig, ProxyGroupConfig
@@ -188,3 +189,19 @@ class AccountPool:
         idx = self._indices.get(type_name, 0) % n
         self._indices[type_name] = (idx + 1) % n
         return pairs[idx]
+
+    def update_account_unfreeze_at(
+        self,
+        fingerprint_id: str,
+        account_name: str,
+        unfreeze_at: int | None,
+    ) -> bool:
+        for group in self._groups:
+            if group.fingerprint_id != fingerprint_id:
+                continue
+            for index, account in enumerate(group.accounts):
+                if account.name != account_name:
+                    continue
+                group.accounts[index] = replace(account, unfreeze_at=unfreeze_at)
+                return True
+        return False

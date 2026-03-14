@@ -4,7 +4,7 @@ API 与配置页鉴权。
 - auth.api_key: 保护 /{type}/v1/*
 - auth.config_secret: 保护 /config 与 /api/config、/api/types
 
-config_secret 会在启动时从明文自动转换成带前缀的 PBKDF2 哈希并回写到 config.yaml。
+config_secret 在文件模式下会回写为带前缀的 PBKDF2 哈希；环境变量覆盖模式下仅在内存中哈希。
 """
 
 from __future__ import annotations
@@ -17,10 +17,17 @@ import re
 import secrets
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from fastapi import HTTPException, Request, status
 
-from core.config.settings import get, get_config_path, load_config, reset_cache
+from core.config.settings import (
+    get,
+    get_config_path,
+    has_env_override,
+    load_config,
+    reset_cache,
+)
 
 API_AUTH_REALM = "Bearer"
 CONFIG_SECRET_PREFIX = "web2api_pbkdf2_sha256"
@@ -71,7 +78,17 @@ def _is_hashed_config_secret(value: str) -> bool:
     return value.startswith(f"{CONFIG_SECRET_PREFIX}$")
 
 
+@lru_cache(maxsize=1)
+def _hosted_config_secret_hash() -> str:
+    value = str(get("auth", "config_secret", "") or "").strip()
+    if not value:
+        return ""
+    return value if _is_hashed_config_secret(value) else hash_config_secret(value)
+
+
 def configured_config_secret_hash() -> str:
+    if has_env_override("auth", "config_secret"):
+        return _hosted_config_secret_hash()
     value = str(get("auth", "config_secret", "") or "").strip()
     return value if _is_hashed_config_secret(value) else ""
 
@@ -135,6 +152,9 @@ def verify_config_secret(secret: str, encoded: str) -> bool:
 
 
 def ensure_config_secret_hashed() -> None:
+    if has_env_override("auth", "config_secret"):
+        _hosted_config_secret_hash()
+        return
     cfg = load_config()
     auth_cfg = cfg.get("auth")
     if not isinstance(auth_cfg, dict):

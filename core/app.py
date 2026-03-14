@@ -9,6 +9,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from core.account.pool import AccountPool
 from core.api.auth import (
@@ -24,7 +25,7 @@ from core.api.anthropic_routes import create_anthropic_router
 from core.api.chat_handler import ChatHandler
 from core.api.config_routes import create_config_router
 from core.api.routes import create_router
-from core.config.repository import ConfigRepository
+from core.config.repository import create_config_repository
 from core.config.settings import get, get_bool
 from core.constants import CDP_PORT_RANGE, CHROMIUM_BIN
 from core.plugin.base import PluginRegistry
@@ -42,7 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     register_claude_plugin()
     ensure_config_secret_hashed()
 
-    repo = ConfigRepository()
+    repo = create_config_repository()
     repo.init_schema()
     groups = repo.load_groups()
 
@@ -137,6 +138,18 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/", include_in_schema=False)
+    def root() -> JSONResponse:
+        return JSONResponse(
+            {
+                "status": "ok",
+                "config_login_enabled": config_login_enabled(),
+                "login": "/login",
+                "config": "/config",
+            }
+        )
+
     app.include_router(create_router())
     app.include_router(create_anthropic_router())
     app.include_router(create_config_router())
