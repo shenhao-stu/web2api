@@ -300,6 +300,15 @@ class BrowserManager:
             "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
+            # Memory optimization for constrained environments (HF Spaces cpu-basic)
+            "--renderer-process-limit=1",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-component-update",
+            "--disable-sync",
+            "--disable-translate",
+            "--disable-features=MediaRouter,TranslateUI",
+            "--js-flags=--max-old-space-size=256",
         ]
         proxy_forwarder = None
         if proxy_key.use_proxy:
@@ -346,6 +355,7 @@ class BrowserManager:
         env["NODE_OPTIONS"] = (
             env.get("NODE_OPTIONS") or ""
         ).strip() + " --no-deprecation"
+        env.setdefault("DBUS_SESSION_BUS_ADDRESS", "/dev/null")
         stderr_path = self._stderr_log_path(proxy_key, port)
         stderr_fp = stderr_path.open("ab")
         try:
