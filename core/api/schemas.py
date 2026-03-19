@@ -51,6 +51,7 @@ class OpenAIChatRequest(BaseModel):
         description="是否允许单次响应中并行多个 tool_call，false 时仅 0 或 1 个",
     )
     resume_session_id: str | None = Field(default=None, exclude=True)
+    upstream_model: str | None = Field(default=None, exclude=True)
     attachment_files: list[InputAttachment] = Field(
         default_factory=list,
         exclude=True,

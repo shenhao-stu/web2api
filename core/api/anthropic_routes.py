@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from core.api.auth import require_api_key
 from core.api.chat_handler import ChatHandler
-from core.api.routes import get_chat_handler
+from core.api.routes import get_chat_handler, resolve_request_model
 from core.protocol.anthropic import AnthropicProtocolAdapter
 from core.protocol.service import CanonicalChatService
 
@@ -28,7 +28,10 @@ def create_anthropic_router() -> APIRouter:
     ) -> Any:
         raw_body = await request.json()
         try:
-            canonical_req = adapter.parse_request(provider, raw_body)
+            canonical_req = resolve_request_model(
+                provider,
+                adapter.parse_request(provider, raw_body),
+            )
         except Exception as exc:
             status, payload = adapter.render_error(exc)
             return JSONResponse(status_code=status, content=payload)

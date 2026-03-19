@@ -19,6 +19,7 @@ from core.api.auth import require_api_key
 from core.api.chat_handler import ChatHandler
 from core.plugin.base import PluginRegistry
 from core.protocol.openai import OpenAIProtocolAdapter
+from core.protocol.schemas import CanonicalChatRequest
 from core.protocol.service import CanonicalChatService
 
 
@@ -30,25 +31,26 @@ def get_chat_handler(request: Request) -> ChatHandler:
     return handler
 
 
+def resolve_request_model(
+    provider: str,
+    canonical_req: CanonicalChatRequest,
+) -> CanonicalChatRequest:
+    resolved = PluginRegistry.resolve_model(provider, canonical_req.model)
+    canonical_req.model = resolved.public_model
+    canonical_req.metadata["upstream_model"] = resolved.upstream_model
+    return canonical_req
+
+
 def create_router() -> APIRouter:
     """创建 OpenAI 协议路由。"""
     router = APIRouter(dependencies=[Depends(require_api_key)])
     adapter = OpenAIProtocolAdapter()
 
     def _list_models(provider: str) -> dict[str, Any]:
-        plugin = PluginRegistry.get(provider)
         try:
-            mapping = plugin.model_mapping() if plugin is not None else None
-        except Exception:
-            mapping = None
-
-        if isinstance(mapping, dict) and mapping:
-            model_ids = list(mapping.keys())
-        else:
-            raise HTTPException(
-                status_code=500, detail="model_mapping is not implemented"
-            )
-
+            metadata = PluginRegistry.model_metadata(provider)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         now = int(time.time())
         return {
             "object": "list",
@@ -59,7 +61,7 @@ def create_router() -> APIRouter:
                     "created": now,
                     "owned_by": provider,
                 }
-                for mid in model_ids
+                for mid in metadata["public_models"]
             ],
         }
 
@@ -78,7 +80,10 @@ def create_router() -> APIRouter:
     ) -> Any:
         raw_body = await request.json()
         try:
-            canonical_req = adapter.parse_request(provider, raw_body)
+            canonical_req = resolve_request_model(
+                provider,
+                adapter.parse_request(provider, raw_body),
+            )
         except Exception as exc:
             status, payload = adapter.render_error(exc)
             return JSONResponse(status_code=status, content=payload)

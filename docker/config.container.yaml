@@ -12,7 +12,7 @@ auth:
   api_key: ''
 
   # Leave empty to disable the config page.
-  # See docs/config.md for file-backed vs hosted-mode behavior.
+  # File-backed mode writes back a hashed secret; env-override mode hashes it in memory only.
   config_secret: ''
   # Maximum number of failed login attempts before locking
   config_login_max_failures: 5
@@ -49,7 +49,7 @@ browser:
 
 scheduler:
   # Maximum number of tabs allowed to run concurrently
-  tab_max_concurrent: 5
+  tab_max_concurrent: 1
   # Interval in seconds for browser garbage collection
   browser_gc_interval_seconds: 300
   # Seconds of inactivity before a tab is considered idle
@@ -62,9 +62,13 @@ claude:
   start_url: ''
   # Custom API base URL (leave empty to use the default endpoint)
   api_base: ''
-  # Model name mapping: alias -> actual model identifier
+  # Model name mapping: public model id -> Claude upstream model id
   model_mapping:
-    s4: claude-sonnet-4-5-20250929
+    claude-sonnet-4-5: claude-sonnet-4-5
+    claude-sonnet-4.6: claude-sonnet-4-6
+    claude-sonnet-4-6-thinking: claude-sonnet-4-6-thinking
+    claude-haiku-4-5: claude-haiku-4-5
+    claude-opus-4-6: claude-opus-4-6
 
 mock:
   # Port for the mock server

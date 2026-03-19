@@ -29,16 +29,24 @@ from core.config.repository import ConfigRepository
 from core.config.schema import AccountConfig, ProxyGroupConfig
 from core.config.settings import get
 from core.constants import TIMEZONE
-from core.plugin.base import AccountFrozenError, BaseSitePlugin, PluginRegistry
+from core.plugin.base import (
+    AccountFrozenError,
+    BaseSitePlugin,
+    BrowserResourceInvalidError,
+    PluginRegistry,
+)
 from core.plugin.helpers import clear_cookies_for_domain
 from core.runtime.browser_manager import BrowserManager, ClosedTabInfo, TabRuntime
 from core.runtime.keys import ProxyKey
+from core.runtime.local_proxy_forwarder import LocalProxyForwarder, UpstreamProxy, parse_proxy_server
 from core.runtime.session_cache import SessionCache, SessionEntry
 
 from core.api.conv_parser import parse_conv_uuid_from_messages, session_id_suffix
+from core.api.fingerprint import compute_conversation_fingerprint
 from core.api.react import format_react_prompt
 from core.api.schemas import OpenAIChatRequest, extract_user_content
 from core.hub.schemas import OpenAIStreamEvent
+from core.runtime.conversation_index import ConversationIndex
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +83,9 @@ class _RequestTarget:
     page: Page
     session_id: str | None
     full_history: bool
+    proxy_url: str | None = None
+    proxy_auth: tuple[str, str] | None = None
+    proxy_forwarder: LocalProxyForwarder | None = None
 
 
 class ChatHandler:
@@ -91,6 +102,7 @@ class ChatHandler:
         self._session_cache = session_cache
         self._browser_manager = browser_manager
         self._config_repo = config_repo
+        self._conv_index = ConversationIndex()
         self._schedule_lock = asyncio.Lock()
         self._stop_event = asyncio.Event()
         self._busy_sessions: set[str] = set()
@@ -175,6 +187,33 @@ class ChatHandler:
 
             try:
                 async with self._schedule_lock:
+                    # Evict stale sessions to prevent unbounded accumulation.
+                    stale_ids = self._session_cache.evict_stale()
+                    # Evict stale fingerprint entries in sync.
+                    stale_fp = self._conv_index.evict_stale(ttl=1800.0)
+                    if stale_fp:
+                        logger.info(
+                            "[maintenance] evicted %d stale fingerprint entries",
+                            len(stale_fp),
+                        )
+                    if stale_ids:
+                        for sid in stale_ids:
+                            plugin_type = None
+                            for pk, entry in self._browser_manager.list_browser_entries():
+                                for tn, tab in entry.tabs.items():
+                                    if sid in tab.sessions:
+                                        tab.sessions.discard(sid)
+                                        plugin_type = tn
+                                        break
+                            if plugin_type:
+                                plugin = PluginRegistry.get(plugin_type)
+                                if plugin is not None:
+                                    plugin.drop_session(sid)
+                        logger.info(
+                            "[maintenance] evicted %d stale sessions, cache size=%d",
+                            len(stale_ids),
+                            len(self._session_cache),
+                        )
                     await self._reconcile_tabs_locked()
                     closed = await self._browser_manager.collect_idle_browsers(
                         idle_seconds=self._tab_idle_seconds,
@@ -241,6 +280,31 @@ class ChatHandler:
             plugin = PluginRegistry.get(info.type_name)
             if plugin is not None:
                 plugin.drop_sessions(info.session_ids)
+
+    def _stream_proxy_settings(
+        self,
+        target: _RequestTarget,
+    ) -> tuple[str | None, tuple[str, str] | None, LocalProxyForwarder | None]:
+        if not target.proxy_key.use_proxy:
+            return (None, None, None)
+        upstream_host, upstream_port = parse_proxy_server(target.proxy_key.proxy_host)
+        forwarder = LocalProxyForwarder(
+            UpstreamProxy(
+                host=upstream_host,
+                port=upstream_port,
+                username=target.proxy_key.proxy_user,
+                password=target.group.proxy_pass,
+            ),
+            listen_host="127.0.0.1",
+            listen_port=0,
+            on_log=lambda msg: logger.debug("[stream-proxy] %s", msg),
+        )
+        forwarder.start()
+        return (
+            forwarder.proxy_url,
+            None,
+            forwarder,
+        )
 
     async def _clear_tab_domain_cookies_if_supported(
         self, proxy_key: ProxyKey, type_name: str
@@ -321,6 +385,7 @@ class ChatHandler:
         if entry is None:
             return
         self._session_cache.delete(session_id)
+        self._conv_index.remove_session(session_id)
         self._browser_manager.unregister_session(
             entry.proxy_key,
             entry.type_name,
@@ -344,6 +409,85 @@ class ChatHandler:
         if plugin is not None:
             plugin.drop_sessions(session_ids)
         tab.sessions.clear()
+
+    async def _recover_browser_resource_invalid_locked(
+        self,
+        type_name: str,
+        target: _RequestTarget,
+        request_id: str,
+        active_session_id: str | None,
+        error: BrowserResourceInvalidError,
+        attempt: int,
+        max_retries: int,
+    ) -> None:
+        account_id = self._pool.account_id(target.group, target.account)
+        diagnostics = self._browser_manager.browser_diagnostics(target.proxy_key)
+        logger.warning(
+            "[chat] browser resource invalid attempt=%s/%s type=%s proxy=%s account=%s session_id=%s request_id=%s resource=%s helper=%s stage=%s stream_phase=%s browser_present=%s proc_alive=%s cdp_listening=%s tab_count=%s active_requests=%s err=%s",
+            attempt + 1,
+            max_retries,
+            type_name,
+            target.proxy_key.fingerprint_id,
+            account_id,
+            active_session_id,
+            request_id,
+            error.resource_hint,
+            error.helper_name,
+            error.stage,
+            error.stream_phase,
+            diagnostics.get("browser_present"),
+            diagnostics.get("proc_alive"),
+            diagnostics.get("cdp_listening"),
+            diagnostics.get("tab_count"),
+            diagnostics.get("active_requests"),
+            error,
+        )
+        stderr_tail = str(diagnostics.get("stderr_tail") or "").strip()
+        if stderr_tail:
+            logger.warning(
+                "[chat] browser resource invalid stderr tail proxy=%s request_id=%s:\n%s",
+                target.proxy_key.fingerprint_id,
+                request_id,
+                stderr_tail,
+            )
+
+        if active_session_id is not None:
+            self._invalidate_session_locked(active_session_id)
+        if error.resource_hint == "transport":
+            logger.warning(
+                "[chat] transport-level stream failure, keep tab/browser and retry proxy=%s request_id=%s",
+                target.proxy_key.fingerprint_id,
+                request_id,
+            )
+            return
+        self._browser_manager.mark_tab_draining(target.proxy_key, type_name)
+
+        browser_restart_reason: str | None = None
+        if error.resource_hint == "browser":
+            browser_restart_reason = "resource_hint"
+        # Legacy: page_fetch transport is no longer used by Claude (context_request since v0.x).
+        # Kept for potential future plugins that still use page_fetch transport.
+        elif (
+            error.helper_name == "stream_raw_via_page_fetch"
+            and error.stage in {"read_timeout", "evaluate_timeout"}
+        ):
+            browser_restart_reason = f"{error.helper_name}:{error.stage}"
+
+        if browser_restart_reason is not None:
+            logger.warning(
+                "[chat] escalating browser recovery to full restart proxy=%s request_id=%s reason=%s",
+                target.proxy_key.fingerprint_id,
+                request_id,
+                browser_restart_reason,
+            )
+            closed = await self._browser_manager.close_browser(target.proxy_key)
+            self._apply_closed_tabs_locked(closed)
+            return
+
+        self._invalidate_tab_sessions_locked(target.proxy_key, type_name)
+        closed = await self._browser_manager.close_tab(target.proxy_key, type_name)
+        if closed is not None:
+            self._apply_closed_tabs_locked([closed])
 
     def _revive_tab_if_possible_locked(
         self,
@@ -481,9 +625,6 @@ class ChatHandler:
         self,
         type_name: str,
     ) -> _RequestTarget:
-        # 先做一次轻量收尾，把已 drained 的 tab 尽快切号/关闭。
-        await self._reconcile_tabs_locked()
-
         # 1. 已打开浏览器里已有该 type 的可服务 tab，直接复用。
         existing_tabs: list[tuple[int, float, ProxyKey, TabRuntime]] = []
         for proxy_key, entry in self._browser_manager.list_browser_entries():
@@ -699,7 +840,20 @@ class ChatHandler:
 
         raw_messages = _request_messages_as_dicts(req)
         conv_uuid = req.resume_session_id or parse_conv_uuid_from_messages(raw_messages)
-        logger.info("[chat] type=%s parsed conv_uuid=%s", type_name, conv_uuid)
+
+        # Fingerprint matching: when the client doesn't preserve the zero-width
+        # session marker (conv_uuid is None), compute a fingerprint from
+        # system prompt + first user message and look up the matching session.
+        # This replaces sticky session and prevents context pollution.
+        fingerprint = ""
+        if not conv_uuid:
+            fingerprint = compute_conversation_fingerprint(req.messages)
+            if fingerprint:
+                entry = self._conv_index.lookup(fingerprint)
+                if entry is not None:
+                    conv_uuid = entry.session_id
+
+        logger.info("[chat] type=%s parsed conv_uuid=%s fingerprint=%s", type_name, conv_uuid, fingerprint or "n/a")
 
         has_tools = bool(req.tools)
         react_prompt_prefix = format_react_prompt(req.tools or []) if has_tools else ""
@@ -753,13 +907,22 @@ class ChatHandler:
                     encoding="utf-8",
                 )
 
+                account_id = self._pool.account_id(target.group, target.account)
                 session_id = target.session_id
                 if session_id is None:
+                    await plugin.ensure_request_ready(
+                        target.context,
+                        target.page,
+                        request_id=request_id,
+                        session_id=None,
+                        phase="create_conversation",
+                        account_id=account_id,
+                    )
                     logger.info(
                         "[chat] create_conversation type=%s proxy=%s account=%s",
                         type_name,
                         target.proxy_key.fingerprint_id,
-                        self._pool.account_id(target.group, target.account),
+                        account_id,
                     )
                     session_id = await plugin.create_conversation(
                         target.context,
@@ -767,11 +930,13 @@ class ChatHandler:
                         timezone=target.group.timezone
                         or getattr(target.proxy_key, "timezone", None)
                         or TIMEZONE,
+                        public_model=str(getattr(req, "model", "") or ""),
+                        upstream_model=str(getattr(req, "upstream_model", "") or ""),
+                        request_id=request_id,
                     )
                     if not session_id:
                         raise RuntimeError("插件创建会话失败")
                     async with self._schedule_lock:
-                        account_id = self._pool.account_id(target.group, target.account)
                         self._session_cache.put(
                             session_id,
                             target.proxy_key,
@@ -784,14 +949,33 @@ class ChatHandler:
                             session_id,
                         )
                         self._busy_sessions.add(session_id)
+                        # Register fingerprint for future matching
+                        if fingerprint:
+                            self._conv_index.register(
+                                fingerprint,
+                                session_id,
+                                len(req.messages),
+                                account_id,
+                            )
                 active_session_id = session_id
 
+                # Skip pre-stream probe for newly created sessions:
+                # create_conversation already validated page health.
+                if target.session_id is not None:
+                    await plugin.ensure_request_ready(
+                        target.context,
+                        target.page,
+                        request_id=request_id,
+                        session_id=session_id,
+                        phase="stream_completion",
+                        account_id=account_id,
+                    )
                 logger.info(
                     "[chat] stream_completion type=%s session_id=%s proxy=%s account=%s full_history=%s",
                     type_name,
                     session_id,
                     target.proxy_key.fingerprint_id,
-                    self._pool.account_id(target.group, target.account),
+                    account_id,
                     target.full_history,
                 )
                 # 根据是否 full_history 选择附件来源：
@@ -803,19 +987,38 @@ class ChatHandler:
                     else req.attachment_files_last_user
                 )
 
-                stream = cast(
-                    AsyncIterator[str],
-                    plugin.stream_completion(
-                        target.context,
-                        target.page,
-                        session_id,
-                        content,
-                        request_id=request_id,
-                        attachments=attachments,
-                    ),
-                )
-                async for chunk in stream:
-                    yield chunk
+                proxy_url = None
+                proxy_auth = None
+                proxy_forwarder = None
+                if plugin.stream_transport() == "context_request":
+                    proxy_url, proxy_auth, proxy_forwarder = self._stream_proxy_settings(target)
+                    target.proxy_url = proxy_url
+                    target.proxy_auth = proxy_auth
+                    target.proxy_forwarder = proxy_forwarder
+                try:
+                    stream = cast(
+                        AsyncIterator[str],
+                        plugin.stream_completion(
+                            target.context,
+                            target.page,
+                            session_id,
+                            content,
+                            request_id=request_id,
+                            attachments=attachments,
+                            proxy_url=proxy_url,
+                            proxy_auth=proxy_auth,
+                        ),
+                    )
+                    async for chunk in stream:
+                        yield chunk
+                finally:
+                    if proxy_forwarder is not None:
+                        try:
+                            proxy_forwarder.stop()
+                        except Exception:
+                            pass
+                        target.proxy_forwarder = None
+
                 yield session_id_suffix(session_id)
                 return
             except AccountFrozenError as e:
@@ -845,13 +1048,48 @@ class ChatHandler:
                         f"已重试 {max_retries} 次仍限流/过载，请稍后再试: {e}"
                     ) from e
                 continue
+            except BrowserResourceInvalidError as e:
+                proxy_for_log = (
+                    target.proxy_key.fingerprint_id
+                    if target is not None
+                    else getattr(getattr(e, "proxy_key", None), "fingerprint_id", None)
+                )
+                logger.warning(
+                    "[chat] browser resource invalid bubbled type=%s request_id=%s proxy=%s session_id=%s helper=%s stage=%s resource=%s err=%s",
+                    type_name,
+                    request_id,
+                    proxy_for_log,
+                    active_session_id,
+                    e.helper_name,
+                    e.stage,
+                    e.resource_hint,
+                    e,
+                )
+                async with self._schedule_lock:
+                    if target is not None:
+                        await self._recover_browser_resource_invalid_locked(
+                            type_name,
+                            target,
+                            request_id,
+                            active_session_id,
+                            e,
+                            attempt,
+                            max_retries,
+                        )
+                    elif getattr(e, "proxy_key", None) is not None:
+                        closed = await self._browser_manager.close_browser(e.proxy_key)
+                        self._apply_closed_tabs_locked(closed)
+                if attempt == max_retries - 1:
+                    raise RuntimeError(
+                        f"浏览器资源已失效，重试 {max_retries} 次后仍失败: {e}"
+                    ) from e
+                continue
             finally:
                 if target is not None:
                     async with self._schedule_lock:
                         if active_session_id is not None:
                             self._busy_sessions.discard(active_session_id)
                         self._browser_manager.release_tab(target.proxy_key, type_name)
-                        await self._reconcile_tabs_locked()
 
     async def stream_openai_events(
         self,

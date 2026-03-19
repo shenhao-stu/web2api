@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from core.constants import CDP_PORT_RANGE, CHROMIUM_BIN, TIMEZONE, user_data_dir
+from core.plugin.errors import BrowserResourceInvalidError
 from core.runtime.keys import ProxyKey
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,85 @@ class BrowserManager:
             return 0
         return sum(tab.active_requests for tab in entry.tabs.values())
 
+    def browser_diagnostics(self, proxy_key: ProxyKey) -> dict[str, Any]:
+        entry = self._entries.get(proxy_key)
+        if entry is None:
+            return {
+                "browser_present": False,
+                "proc_alive": False,
+                "cdp_listening": False,
+                "stderr_tail": "",
+                "tab_count": 0,
+                "active_requests": 0,
+                "tabs": [],
+            }
+        tabs = [
+            {
+                "type": type_name,
+                "state": tab.state,
+                "accepting_new": tab.accepting_new,
+                "active_requests": tab.active_requests,
+                "session_count": len(tab.sessions),
+            }
+            for type_name, tab in entry.tabs.items()
+        ]
+        return {
+            "browser_present": True,
+            "proc_alive": entry.proc.poll() is None,
+            "cdp_listening": _is_cdp_listening(entry.port),
+            "stderr_tail": self._read_stderr_tail(entry.stderr_path),
+            "tab_count": len(entry.tabs),
+            "active_requests": sum(tab.active_requests for tab in entry.tabs.values()),
+            "tabs": tabs,
+        }
+
+    def _raise_browser_resource_invalid(
+        self,
+        proxy_key: ProxyKey,
+        *,
+        detail: str,
+        helper_name: str,
+        stage: str,
+        resource_hint: str = "browser",
+        request_url: str = "",
+        page_url: str = "",
+        request_id: str | None = None,
+        stream_phase: str | None = None,
+        type_name: str | None = None,
+        account_id: str | None = None,
+    ) -> None:
+        diagnostics = self.browser_diagnostics(proxy_key)
+        logger.warning(
+            "[browser-resource-invalid] helper=%s stage=%s proxy=%s resource=%s request_id=%s type=%s account=%s proc_alive=%s cdp_listening=%s tab_count=%s active_requests=%s stderr_tail=%s detail=%s",
+            helper_name,
+            stage,
+            proxy_key.fingerprint_id,
+            resource_hint,
+            request_id,
+            type_name,
+            account_id,
+            diagnostics.get("proc_alive"),
+            diagnostics.get("cdp_listening"),
+            diagnostics.get("tab_count"),
+            diagnostics.get("active_requests"),
+            diagnostics.get("stderr_tail"),
+            detail,
+        )
+        raise BrowserResourceInvalidError(
+            detail,
+            helper_name=helper_name,
+            operation="browser_manager",
+            stage=stage,
+            resource_hint=resource_hint,
+            request_url=request_url,
+            page_url=page_url,
+            request_id=request_id,
+            stream_phase=stream_phase,
+            proxy_key=proxy_key,
+            type_name=type_name,
+            account_id=account_id,
+        )
+
     def touch_browser(self, proxy_key: ProxyKey) -> None:
         entry = self._entries.get(proxy_key)
         if entry is not None:
@@ -217,6 +297,7 @@ class BrowserManager:
             "--force-webrtc-ip-handling-policy",
             "--webrtc-ip-handling-policy=disable_non_proxied_udp",
             "--disable-features=AsyncDNS",
+            "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
         ]
@@ -412,18 +493,60 @@ class BrowserManager:
         if existing is not None:
             return existing
 
+        logger.info(
+            "[tab] opening proxy=%s type=%s account=%s reuse_blank=%s tab_count=%s active_requests=%s",
+            proxy_key.fingerprint_id,
+            type_name,
+            account_id,
+            bool(len(entry.tabs) == 0 and context.pages),
+            len(entry.tabs),
+            sum(tab.active_requests for tab in entry.tabs.values()),
+        )
         # 首个 tab 时复用 Chromium 默认空白页，避免多一个无用标签
         reuse_page = (
             context.pages[0] if (len(entry.tabs) == 0 and context.pages) else None
         )
-        page = await create_page_fn(context, reuse_page)
+        try:
+            page = await create_page_fn(context, reuse_page)
+        except Exception as e:
+            msg = str(e)
+            normalized = msg.lower()
+            if "target.createtarget" in normalized or "failed to open a new tab" in normalized:
+                self._raise_browser_resource_invalid(
+                    proxy_key,
+                    detail=msg,
+                    helper_name="open_tab",
+                    stage="create_page",
+                    resource_hint="browser",
+                    type_name=type_name,
+                    account_id=account_id,
+                )
+            raise
         try:
             await apply_auth_fn(context, page)
-        except Exception:
+        except Exception as e:
             try:
                 await page.close()
             except Exception:
                 pass
+            msg = str(e)
+            normalized = msg.lower()
+            if (
+                "target crashed" in normalized
+                or "page has been closed" in normalized
+                or "browser has been closed" in normalized
+                or "has been disconnected" in normalized
+            ):
+                self._raise_browser_resource_invalid(
+                    proxy_key,
+                    detail=msg,
+                    helper_name="open_tab",
+                    stage="apply_auth",
+                    resource_hint="browser",
+                    page_url=getattr(page, "url", "") or "",
+                    type_name=type_name,
+                    account_id=account_id,
+                )
             raise
 
         tab = TabRuntime(

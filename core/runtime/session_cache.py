@@ -5,12 +5,16 @@
 
 - tab 被关闭或切号时，需要批量失效该 tab 下的 session
 - 单个 session 失效时，需要从缓存中移除，后续按完整历史重建
+- 超过 TTL 的 session 在维护循环中被自动清理
 """
 
 from dataclasses import dataclass
 import time
 
 from core.runtime.keys import ProxyKey
+
+# Sessions older than this are eligible for eviction during maintenance.
+SESSION_TTL_SECONDS = 1800.0  # 30 minutes
 
 
 @dataclass
@@ -58,5 +62,20 @@ class SessionCache:
         for session_id in session_ids:
             self._store.pop(session_id, None)
 
+    def evict_stale(self, ttl: float = SESSION_TTL_SECONDS) -> list[str]:
+        """Remove sessions older than *ttl* seconds. Returns evicted IDs."""
+        now = time.time()
+        stale = [
+            sid
+            for sid, entry in self._store.items()
+            if (now - entry.last_used_at) > ttl
+        ]
+        for sid in stale:
+            del self._store[sid]
+        return stale
+
     def __contains__(self, session_id: str) -> bool:
         return session_id in self._store
+
+    def __len__(self) -> int:
+        return len(self._store)

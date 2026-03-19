@@ -1,139 +1,253 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>配置页登录</title>
+    <title>Admin sign in</title>
     <style>
       :root {
-        --bg: #0f0f12;
-        --surface: #18181c;
-        --border: #2a2a30;
-        --text: #e4e4e7;
-        --text-muted: #a1a1aa;
-        --accent: #3b82f6;
-        --accent-hover: #2563eb;
-        --danger-bg: #451a1a;
+        --bg: #120f0d;
+        --bg-deep: #080706;
+        --panel: rgba(29, 24, 21, 0.9);
+        --line: rgba(247, 239, 230, 0.12);
+        --text: #f7efe6;
+        --muted: #b6aa98;
+        --accent: #efd9bc;
+        --accent-strong: #ddbb8e;
+        --danger-bg: rgba(127, 29, 29, 0.24);
+        --danger-line: rgba(248, 113, 113, 0.28);
         --danger-text: #fecaca;
+        --shadow: 0 34px 90px rgba(0, 0, 0, 0.45);
       }
-      * { box-sizing: border-box; }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: radial-gradient(circle at top, #1a1a22, var(--bg) 55%);
+        padding: 20px;
         color: var(--text);
-        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-family: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(239, 217, 188, 0.16), transparent 28%),
+          linear-gradient(180deg, #171210 0%, var(--bg) 44%, var(--bg-deep) 100%);
       }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.14;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 100% 3px;
+      }
+
       .card {
-        width: min(420px, calc(100vw - 32px));
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        width: min(460px, 100%);
+        padding: 30px;
+        border-radius: 30px;
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(39, 32, 28, 0.96), rgba(24, 20, 17, 0.94));
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
       }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(239, 217, 188, 0.18);
+        background: rgba(239, 217, 188, 0.08);
+        color: var(--accent-strong);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
       h1 {
-        margin: 0 0 8px;
-        font-size: 1.4rem;
+        margin: 18px 0 10px;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        font-size: clamp(2.2rem, 7vw, 3.2rem);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
       }
+
       p {
-        margin: 0 0 18px;
-        color: var(--text-muted);
-        font-size: 14px;
-        line-height: 1.6;
+        margin: 0 0 22px;
+        color: var(--muted);
+        line-height: 1.75;
       }
+
       label {
         display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
         font-size: 13px;
-        color: var(--text-muted);
-        margin-bottom: 6px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
+
       input {
         width: 100%;
-        padding: 11px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: #101014;
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(8, 7, 6, 0.46);
         color: var(--text);
-        font-size: 14px;
+        font-size: 15px;
       }
+
       input:focus {
         outline: none;
-        border-color: var(--accent);
+        border-color: rgba(239, 217, 188, 0.34);
+        box-shadow: 0 0 0 4px rgba(239, 217, 188, 0.08);
       }
-      button {
-        width: 100%;
-        margin-top: 16px;
-        border: none;
-        border-radius: 8px;
-        padding: 11px 14px;
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      button,
+      .link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 999px;
         font-size: 14px;
         font-weight: 600;
-        color: #fff;
-        background: var(--accent);
-        cursor: pointer;
+        text-decoration: none;
       }
-      button:hover { background: var(--accent-hover); }
+
+      button {
+        flex: 1 1 180px;
+        border: none;
+        cursor: pointer;
+        color: #1a140f;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.78;
+      }
+
+      .link {
+        flex: 1 1 140px;
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13px;
+      }
+
       .error {
         display: none;
-        margin-top: 14px;
-        border-radius: 8px;
-        padding: 10px 12px;
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 18px;
+        border: 1px solid var(--danger-line);
         background: var(--danger-bg);
         color: var(--danger-text);
         font-size: 13px;
+        line-height: 1.6;
       }
     </style>
   </head>
   <body>
     <form class="card" id="loginForm">
-      <h1>配置页登录</h1>
-      <p>请输入配置的 <code>auth.config_secret</code> 原始明文。Hosted 模式下也支持通过环境变量提供。</p>
-      <label for="secret">Secret</label>
-      <input id="secret" name="secret" type="password" autocomplete="current-password" />
-      <button type="submit">登录</button>
+      <div class="eyebrow">Admin access</div>
+      <h1>Sign in to the config dashboard.</h1>
+      <p>
+        Use the current admin password for Web2API. If the password is managed by environment
+        variables, this page still accepts that live value.
+      </p>
+
+      <label for="secret">Admin password</label>
+      <input
+        id="secret"
+        name="secret"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Enter admin password"
+      />
+
+      <div class="actions">
+        <button type="submit" id="submitBtn">Sign in</button>
+        <a class="link" href="/">Back home</a>
+      </div>
+
+      <p class="note">The dashboard session is stored in an HTTP-only cookie after sign-in.</p>
       <div class="error" id="error"></div>
     </form>
+
     <script>
       const form = document.getElementById('loginForm')
       const secretInput = document.getElementById('secret')
       const errorEl = document.getElementById('error')
+      const submitBtn = document.getElementById('submitBtn')
 
-      function showError(msg) {
-        errorEl.textContent = msg
+      function showError(message) {
+        errorEl.textContent = message
         errorEl.style.display = 'block'
+      }
+
+      function hideError() {
+        errorEl.style.display = 'none'
+        errorEl.textContent = ''
       }
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault()
-        errorEl.style.display = 'none'
+        hideError()
+
         const secret = secretInput.value.trim()
         if (!secret) {
-          showError('请输入 secret')
+          showError('Enter the admin password.')
+          secretInput.focus()
           return
         }
+
+        submitBtn.disabled = true
+        submitBtn.textContent = 'Signing in…'
         try {
           const res = await fetch('/api/admin/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ secret }),
           })
+
+          const text = await res.text()
+          let data = null
+          try {
+            data = text ? JSON.parse(text) : null
+          } catch (_) {}
+
           if (!res.ok) {
-            let message = '登录失败'
-            try {
-              const data = await res.json()
-              message = data.detail || message
-            } catch (_) {
-              const text = await res.text()
-              message = text || message
-            }
-            throw new Error(message)
+            throw new Error((data && data.detail) || text || 'Sign-in failed.')
           }
+
           window.location.href = '/config'
-        } catch (err) {
-          showError(err.message || '登录失败')
+        } catch (error) {
+          showError(error && error.message ? error.message : 'Sign-in failed.')
+        } finally {
+          submitBtn.disabled = false
+          submitBtn.textContent = 'Sign in'
         }
       })
     </script>

@@ -106,7 +106,7 @@ class OpenAIProtocolAdapter(ProtocolAdapter):
             if session_marker:
                 content_reply += session_marker
         else:
-            content_reply = reply
+            content_reply = content_for_parse
         return {
             "id": chat_id,
             "object": "chat.completion",

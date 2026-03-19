@@ -18,7 +18,7 @@ from core.protocol.images import (
     parse_data_url,
 )
 from core.hub.schemas import OpenAIStreamEvent
-from core.protocol.schemas import CanonicalChatRequest, CanonicalContentBlock
+from core.protocol.schemas import CanonicalChatRequest, CanonicalContentBlock, CanonicalMessage
 
 
 class CanonicalChatService:
@@ -78,6 +78,7 @@ class CanonicalChatService:
             tools=openai_tools or None,
             tool_choice=req.tool_choice,
             resume_session_id=req.resume_session_id,
+            upstream_model=str(req.metadata.get("upstream_model") or "") or None,
             # 由 ChatHandler 根据是否 full_history 选择实际赋值给 attachment_files
             attachment_files=[],
             attachment_files_last_user=last_user_attachments,

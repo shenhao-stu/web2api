@@ -1,6 +1,6 @@
 """
 配置持久化：默认使用 SQLite；提供 DATABASE_URL / WEB2API_DATABASE_URL 时切换到 PostgreSQL。
-表结构：proxy_group, account（含 name, type, auth JSON）。
+表结构：proxy_group, account（含 name, type, auth JSON），以及 app_setting。
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ from core.config.settings import coerce_bool, get_database_url
 
 DB_FILENAME = "db.sqlite3"
 DB_PATH_ENV_KEY = "WEB2API_DB_PATH"
+APP_SETTING_AUTH_API_KEY = "auth.api_key"
+APP_SETTING_AUTH_CONFIG_SECRET_HASH = "auth.config_secret_hash"
 
 
 def _get_db_path() -> Path:
@@ -83,6 +85,16 @@ class _RepositoryBase:
             for g in groups
         ]
 
+    def load_app_settings(self) -> dict[str, str]:
+        raise NotImplementedError
+
+    def get_app_setting(self, key: str) -> str | None:
+        value = self.load_app_settings().get(key)
+        return value if value is not None else None
+
+    def set_app_setting(self, key: str, value: str | None) -> None:
+        raise NotImplementedError
+
     def save_raw(self, raw: list[dict[str, Any]]) -> None:
         """从 API/前端原始格式写入并保存。"""
         groups = _raw_to_groups(raw)
@@ -129,6 +141,14 @@ class _SqliteConfigRepository(_RepositoryBase):
             "CREATE INDEX IF NOT EXISTS ix_account_proxy_group_id ON account(proxy_group_id)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS ix_account_type ON account(type)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_setting (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
         try:
             conn.execute("ALTER TABLE account ADD COLUMN unfreeze_at INTEGER")
         except sqlite3.OperationalError:
@@ -269,6 +289,35 @@ class _SqliteConfigRepository(_RepositoryBase):
         finally:
             conn.close()
 
+    def load_app_settings(self) -> dict[str, str]:
+        self._ensure_schema()
+        conn = self._conn()
+        try:
+            rows = conn.execute(
+                "SELECT key, value FROM app_setting ORDER BY key ASC"
+            ).fetchall()
+            return {str(key): str(value) for key, value in rows}
+        finally:
+            conn.close()
+
+    def set_app_setting(self, key: str, value: str | None) -> None:
+        self._ensure_schema()
+        conn = self._conn()
+        try:
+            if value is None:
+                conn.execute("DELETE FROM app_setting WHERE key = ?", (key,))
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO app_setting (key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (key, value),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
 
 class _PostgresConfigRepository(_RepositoryBase):
     def __init__(self, database_url: str) -> None:
@@ -312,6 +361,14 @@ class _PostgresConfigRepository(_RepositoryBase):
                     "CREATE INDEX IF NOT EXISTS ix_account_proxy_group_id ON account(proxy_group_id)"
                 )
                 cur.execute("CREATE INDEX IF NOT EXISTS ix_account_type ON account(type)")
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS app_setting (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL DEFAULT ''
+                    )
+                    """
+                )
 
     def load_groups(self) -> list[ProxyGroupConfig]:
         groups: list[ProxyGroupConfig] = []
@@ -421,6 +478,26 @@ class _PostgresConfigRepository(_RepositoryBase):
                     (unfreeze_at, fingerprint_id, account_name),
                 )
 
+    def load_app_settings(self) -> dict[str, str]:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT key, value FROM app_setting ORDER BY key ASC")
+                return {str(key): str(value) for key, value in cur.fetchall()}
+
+    def set_app_setting(self, key: str, value: str | None) -> None:
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                if value is None:
+                    cur.execute("DELETE FROM app_setting WHERE key = %s", (key,))
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO app_setting (key, value) VALUES (%s, %s)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                        """,
+                        (key, value),
+                    )
+
 
 class ConfigRepository(_RepositoryBase):
     """配置读写入口。"""
@@ -439,6 +516,15 @@ class ConfigRepository(_RepositoryBase):
 
     def load_raw(self) -> list[dict[str, Any]]:
         return self._backend.load_raw()
+
+    def load_app_settings(self) -> dict[str, str]:
+        return self._backend.load_app_settings()
+
+    def get_app_setting(self, key: str) -> str | None:
+        return self._backend.get_app_setting(key)
+
+    def set_app_setting(self, key: str, value: str | None) -> None:
+        self._backend.set_app_setting(key, value)
 
     def save_raw(self, raw: list[dict[str, Any]]) -> None:
         self._backend.save_raw(raw)

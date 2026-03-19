@@ -4,7 +4,8 @@ API 与配置页鉴权。
 - auth.api_key: 保护 /{type}/v1/*
 - auth.config_secret: 保护 /config 与 /api/config、/api/types
 
-config_secret 在文件模式下会回写为带前缀的 PBKDF2 哈希；环境变量覆盖模式下仅在内存中哈希。
+全局鉴权设置优先级：数据库 > 环境变量回退 > YAML > 默认值。
+config_secret 在文件模式下会回写为带前缀的 PBKDF2 哈希；环境变量回退模式下仅在内存中哈希。
 """
 
 from __future__ import annotations
@@ -18,9 +19,15 @@ import secrets
 import time
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Any, Literal
 
 from fastapi import HTTPException, Request, status
 
+from core.config.repository import (
+    APP_SETTING_AUTH_API_KEY,
+    APP_SETTING_AUTH_CONFIG_SECRET_HASH,
+    ConfigRepository,
+)
 from core.config.settings import (
     get,
     get_config_path,
@@ -36,16 +43,126 @@ ADMIN_SESSION_COOKIE = "web2api_admin_session"
 DEFAULT_ADMIN_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_ADMIN_LOGIN_MAX_FAILURES = 5
 DEFAULT_ADMIN_LOGIN_LOCK_SECONDS = 10 * 60
+AuthSource = Literal["env", "db", "yaml", "default"]
 
 
-def configured_api_keys() -> list[str]:
-    raw = get("auth", "api_key", "")
+@dataclass(frozen=True)
+class EffectiveAuthSettings:
+    api_key_text: str
+    api_key_source: AuthSource
+    config_secret_hash: str
+    config_secret_source: AuthSource
+
+    @property
+    def api_keys(self) -> list[str]:
+        return parse_api_keys(self.api_key_text)
+
+    @property
+    def api_key_env_managed(self) -> bool:
+        return False
+
+    @property
+    def config_secret_env_managed(self) -> bool:
+        return False
+
+    @property
+    def config_login_enabled(self) -> bool:
+        return bool(self.config_secret_hash)
+
+
+def parse_api_keys(raw: Any) -> list[str]:
     if isinstance(raw, list):
         return [str(item).strip() for item in raw if str(item).strip()]
     if raw is None:
         return []
     text = str(raw).replace("\n", ",")
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def normalize_api_key_text(raw: Any) -> str:
+    if isinstance(raw, list):
+        return "\n".join(str(item).strip() for item in raw if str(item).strip())
+    return str(raw or "").strip()
+
+
+def _yaml_auth_config() -> dict[str, Any]:
+    auth_cfg = load_config().get("auth") or {}
+    return auth_cfg if isinstance(auth_cfg, dict) else {}
+
+
+def _normalize_config_secret_hash(value: Any) -> str:
+    secret = str(value or "").strip()
+    if not secret:
+        return ""
+    return secret if _is_hashed_config_secret(secret) else hash_config_secret(secret)
+
+
+@lru_cache(maxsize=1)
+def _hosted_config_secret_hash() -> str:
+    return _normalize_config_secret_hash(get("auth", "config_secret", ""))
+
+
+def build_effective_auth_settings(
+    repo: ConfigRepository | None = None,
+) -> EffectiveAuthSettings:
+    stored = repo.load_app_settings() if repo is not None else {}
+    yaml_auth = _yaml_auth_config()
+
+    if APP_SETTING_AUTH_API_KEY in stored:
+        api_key_text = normalize_api_key_text(stored.get(APP_SETTING_AUTH_API_KEY, ""))
+        api_key_source: AuthSource = "db"
+    elif has_env_override("auth", "api_key"):
+        api_key_text = normalize_api_key_text(get("auth", "api_key", ""))
+        api_key_source = "env"
+    elif "api_key" in yaml_auth:
+        api_key_text = normalize_api_key_text(yaml_auth.get("api_key", ""))
+        api_key_source = "yaml"
+    else:
+        api_key_text = ""
+        api_key_source = "default"
+
+    if APP_SETTING_AUTH_CONFIG_SECRET_HASH in stored:
+        config_secret_hash = _normalize_config_secret_hash(
+            stored.get(APP_SETTING_AUTH_CONFIG_SECRET_HASH, "")
+        )
+        config_secret_source: AuthSource = "db"
+    elif has_env_override("auth", "config_secret"):
+        config_secret_hash = _hosted_config_secret_hash()
+        config_secret_source = "env"
+    elif "config_secret" in yaml_auth:
+        config_secret_hash = _normalize_config_secret_hash(yaml_auth.get("config_secret", ""))
+        config_secret_source = "yaml"
+    else:
+        config_secret_hash = ""
+        config_secret_source = "default"
+
+    return EffectiveAuthSettings(
+        api_key_text=api_key_text,
+        api_key_source=api_key_source,
+        config_secret_hash=config_secret_hash,
+        config_secret_source=config_secret_source,
+    )
+
+
+def refresh_runtime_auth_settings(app: Any) -> EffectiveAuthSettings:
+    repo = getattr(app.state, "config_repo", None)
+    settings = build_effective_auth_settings(repo)
+    app.state.auth_settings = settings
+    return settings
+
+
+def get_effective_auth_settings(request: Request | None = None) -> EffectiveAuthSettings:
+    if request is not None:
+        settings = getattr(request.app.state, "auth_settings", None)
+        if isinstance(settings, EffectiveAuthSettings):
+            return settings
+        repo = getattr(request.app.state, "config_repo", None)
+        return build_effective_auth_settings(repo)
+    return build_effective_auth_settings()
+
+
+def configured_api_keys(repo: ConfigRepository | None = None) -> list[str]:
+    return build_effective_auth_settings(repo).api_keys
 
 
 def _extract_request_api_key(request: Request) -> str:
@@ -59,7 +176,7 @@ def _extract_request_api_key(request: Request) -> str:
 
 
 def require_api_key(request: Request) -> None:
-    expected_keys = configured_api_keys()
+    expected_keys = get_effective_auth_settings(request).api_keys
     if not expected_keys:
         return
     provided = _extract_request_api_key(request)
@@ -69,7 +186,7 @@ def require_api_key(request: Request) -> None:
                 return
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="未授权，请提供正确的 API Key",
+        detail="Unauthorized. Provide a valid API key.",
         headers={"WWW-Authenticate": API_AUTH_REALM},
     )
 
@@ -78,23 +195,12 @@ def _is_hashed_config_secret(value: str) -> bool:
     return value.startswith(f"{CONFIG_SECRET_PREFIX}$")
 
 
-@lru_cache(maxsize=1)
-def _hosted_config_secret_hash() -> str:
-    value = str(get("auth", "config_secret", "") or "").strip()
-    if not value:
-        return ""
-    return value if _is_hashed_config_secret(value) else hash_config_secret(value)
+def configured_config_secret_hash(repo: ConfigRepository | None = None) -> str:
+    return build_effective_auth_settings(repo).config_secret_hash
 
 
-def configured_config_secret_hash() -> str:
-    if has_env_override("auth", "config_secret"):
-        return _hosted_config_secret_hash()
-    value = str(get("auth", "config_secret", "") or "").strip()
-    return value if _is_hashed_config_secret(value) else ""
-
-
-def config_login_enabled() -> bool:
-    return bool(configured_config_secret_hash())
+def config_login_enabled(request: Request | None = None) -> bool:
+    return get_effective_auth_settings(request).config_login_enabled
 
 
 def configured_config_login_max_failures() -> int:
@@ -151,9 +257,11 @@ def verify_config_secret(secret: str, encoded: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def ensure_config_secret_hashed() -> None:
+def ensure_config_secret_hashed(repo: ConfigRepository | None = None) -> None:
     if has_env_override("auth", "config_secret"):
         _hosted_config_secret_hash()
+        return
+    if repo is not None and repo.get_app_setting(APP_SETTING_AUTH_CONFIG_SECRET_HASH) is not None:
         return
     cfg = load_config()
     auth_cfg = cfg.get("auth")
@@ -294,14 +402,14 @@ class AdminLoginAttemptStore:
 def _admin_store(request: Request) -> AdminSessionStore:
     store = getattr(request.app.state, "admin_sessions", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="管理会话未初始化")
+        raise HTTPException(status_code=503, detail="Admin session store is unavailable")
     return store
 
 
 def _admin_login_attempt_store(request: Request) -> AdminLoginAttemptStore:
     store = getattr(request.app.state, "admin_login_attempts", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="登录限流未初始化")
+        raise HTTPException(status_code=503, detail="Login rate limiter is unavailable")
     return store
 
 
@@ -316,7 +424,7 @@ def check_admin_login_rate_limit(request: Request) -> None:
     if remaining > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"登录失败次数过多，请 {remaining} 秒后再试",
+            detail=f"Too many failed login attempts. Try again in {remaining} seconds.",
         )
 
 
@@ -329,19 +437,19 @@ def record_admin_login_success(request: Request) -> None:
 
 
 def admin_logged_in(request: Request) -> bool:
-    if not config_login_enabled():
+    if not config_login_enabled(request):
         return False
     token = (request.cookies.get(ADMIN_SESSION_COOKIE) or "").strip()
     return _admin_store(request).is_valid(token)
 
 
-def require_config_login_enabled() -> None:
-    if not config_login_enabled():
-        raise HTTPException(status_code=404, detail="配置页面未启用")
+def require_config_login_enabled(request: Request | None = None) -> None:
+    if not config_login_enabled(request):
+        raise HTTPException(status_code=404, detail="Config dashboard is disabled")
 
 
 def require_config_login(request: Request) -> None:
-    require_config_login_enabled()
+    require_config_login_enabled(request)
     if admin_logged_in(request):
         return
-    raise HTTPException(status_code=401, detail="请先登录配置页面")
+    raise HTTPException(status_code=401, detail="Please sign in to access the config dashboard")

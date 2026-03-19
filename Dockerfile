@@ -70,15 +70,15 @@ RUN set -eux; \
     mkdir -p /opt/fingerprint-chromium; \
     case "${arch}" in \
       amd64|x86_64) \
-        curl -L --fail "${FINGERPRINT_CHROMIUM_URL_AMD64}" -o /tmp/fingerprint-chromium.tar.xz; \
+        curl -L --fail --retry 5 --retry-delay 3 --retry-all-errors "${FINGERPRINT_CHROMIUM_URL_AMD64}" -o /tmp/fingerprint-chromium.tar.xz; \
         tar -xf /tmp/fingerprint-chromium.tar.xz -C /opt/fingerprint-chromium --strip-components=1; \
         rm -f /tmp/fingerprint-chromium.tar.xz; \
         ;; \
       arm64|aarch64) \
-        curl -L --fail "${FINGERPRINT_CHROMIUM_URL_ARM64_CHROMIUM_DEB}" -o /tmp/ungoogled-chromium.deb; \
-        curl -L --fail "${FINGERPRINT_CHROMIUM_URL_ARM64_COMMON_DEB}" -o /tmp/ungoogled-chromium-common.deb; \
-        curl -L --fail "${FINGERPRINT_CHROMIUM_URL_ARM64_SANDBOX_DEB}" -o /tmp/ungoogled-chromium-sandbox.deb; \
-        curl -L --fail "${FINGERPRINT_CHROMIUM_URL_ARM64_L10N_DEB}" -o /tmp/ungoogled-chromium-l10n.deb; \
+        curl -L --fail --retry 5 --retry-delay 3 --retry-all-errors "${FINGERPRINT_CHROMIUM_URL_ARM64_CHROMIUM_DEB}" -o /tmp/ungoogled-chromium.deb; \
+        curl -L --fail --retry 5 --retry-delay 3 --retry-all-errors "${FINGERPRINT_CHROMIUM_URL_ARM64_COMMON_DEB}" -o /tmp/ungoogled-chromium-common.deb; \
+        curl -L --fail --retry 5 --retry-delay 3 --retry-all-errors "${FINGERPRINT_CHROMIUM_URL_ARM64_SANDBOX_DEB}" -o /tmp/ungoogled-chromium-sandbox.deb; \
+        curl -L --fail --retry 5 --retry-delay 3 --retry-all-errors "${FINGERPRINT_CHROMIUM_URL_ARM64_L10N_DEB}" -o /tmp/ungoogled-chromium-l10n.deb; \
         apt-get update; \
         apt-get install -y --no-install-recommends /tmp/ungoogled-chromium.deb /tmp/ungoogled-chromium-common.deb /tmp/ungoogled-chromium-sandbox.deb /tmp/ungoogled-chromium-l10n.deb; \
         rm -rf /var/lib/apt/lists/* /tmp/ungoogled-chromium*.deb; \

@@ -17,7 +17,10 @@ from playwright.async_api import BrowserContext, Page
 
 from core.api.schemas import InputAttachment
 from core.config.settings import get
-from core.plugin.errors import AccountFrozenError  # noqa: F401  — re-export for backward compat
+from core.plugin.errors import (  # noqa: F401  — re-export for backward compat
+    AccountFrozenError,
+    BrowserResourceInvalidError,
+)
 from core.plugin.helpers import (
     apply_cookie_auth,
     create_page_for_site,
@@ -25,6 +28,12 @@ from core.plugin.helpers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ResolvedModel:
+    public_model: str
+    upstream_model: str
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +87,18 @@ class AbstractPlugin(ABC):
     ) -> None:
         raise NotImplementedError
 
+    async def ensure_request_ready(
+        self,
+        context: BrowserContext,
+        page: Page,
+        *,
+        request_id: str = "",
+        session_id: str | None = None,
+        phase: str = "",
+        account_id: str = "",
+    ) -> None:
+        del context, page, request_id, session_id, phase, account_id
+
     async def create_conversation(
         self,
         context: BrowserContext,
@@ -119,8 +140,75 @@ class AbstractPlugin(ABC):
         """子类可覆盖；BaseSitePlugin 会从 config_section 的 model_mapping 读取。"""
         return None
 
+    def normalized_model_mapping(self) -> dict[str, str]:
+        mapping = self.model_mapping()
+        if not isinstance(mapping, dict) or not mapping:
+            raise ValueError("model_mapping is not implemented")
+        normalized: dict[str, str] = {}
+        for public_model, upstream_model in mapping.items():
+            public_id = str(public_model or "").strip()
+            upstream_id = str(upstream_model or "").strip()
+            if public_id and upstream_id:
+                normalized[public_id] = upstream_id
+        if not normalized:
+            raise ValueError("model_mapping is not implemented")
+        return normalized
+
+    def listed_model_mapping(self) -> dict[str, str]:
+        return self.normalized_model_mapping()
+
+    def default_public_model(self) -> str:
+        listed = self.listed_model_mapping()
+        if listed:
+            return next(iter(listed))
+        return next(iter(self.normalized_model_mapping()))
+
+    def resolve_model(self, model: str | None) -> ResolvedModel:
+        mapping = self.normalized_model_mapping()
+        requested = str(model or "").strip()
+        if not requested:
+            default_public = self.default_public_model()
+            return ResolvedModel(
+                public_model=default_public,
+                upstream_model=mapping[default_public],
+            )
+        if requested in mapping:
+            return ResolvedModel(
+                public_model=requested,
+                upstream_model=mapping[requested],
+            )
+        for public_model, upstream_model in mapping.items():
+            if requested == upstream_model:
+                return ResolvedModel(
+                    public_model=public_model,
+                    upstream_model=upstream_model,
+                )
+        supported = ", ".join(mapping.keys())
+        raise ValueError(f"Unknown model: {requested}. Supported models: {supported}")
+
     def on_http_error(self, message: str, headers: dict[str, str] | None) -> int | None:
         return None
+
+    def stream_transport(self) -> str:
+        return "page_fetch"
+
+    def stream_transport_options(
+        self,
+        context: BrowserContext,
+        page: Page,
+        session_id: str,
+        state: dict[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        del context, page, session_id, state
+        options: dict[str, Any] = {}
+        proxy_url = str(kwargs.get("proxy_url") or "").strip()
+        proxy_auth = kwargs.get("proxy_auth")
+        if proxy_url:
+            options["proxy_url"] = proxy_url
+        if isinstance(proxy_auth, tuple) and len(proxy_auth) == 2:
+            options["proxy_auth"] = proxy_auth
+        return options
 
 
 # ---------------------------------------------------------------------------
@@ -206,20 +294,38 @@ class BaseSitePlugin(AbstractPlugin):
         page: Page,
         **kwargs: Any,
     ) -> str | None:
+        extra_kwargs = dict(kwargs)
+        request_id = str(extra_kwargs.pop("request_id", "") or "")
         # 调用子类获取站点上下文
-        site_context = await self.fetch_site_context(context, page)
+        site_context = await self.fetch_site_context(
+            context,
+            page,
+            request_id=request_id,
+        )
         if site_context is None:
             logger.warning(
                 "[%s] fetch_site_context 返回 None，请确认已登录", self.type_name
             )
             return None
         # 通过站点上下文创建会话
-        conv_id = await self.create_session(context, page, site_context)
+        conv_id = await self.create_session(
+            context,
+            page,
+            site_context,
+            request_id=request_id,
+            **extra_kwargs,
+        )
         if conv_id is None:
             return None
         state: dict[str, Any] = {"site_context": site_context}
         if kwargs.get("timezone") is not None:
             state["timezone"] = kwargs["timezone"]
+        public_model = str(kwargs.get("public_model") or "").strip()
+        if public_model:
+            state["public_model"] = public_model
+        upstream_model = str(kwargs.get("upstream_model") or "").strip()
+        if upstream_model:
+            state["upstream_model"] = upstream_model
         self._session_state[conv_id] = state
         logger.info(
             "[%s] create_conversation done conv_id=%s sessions=%s",
@@ -241,6 +347,7 @@ class BaseSitePlugin(AbstractPlugin):
         if not state:
             raise RuntimeError(f"未知会话 ID: {session_id}")
 
+        request_id: str = kwargs.get("request_id", "")
         url = self.build_completion_url(session_id, state)
         attachments = list(kwargs.get("attachments") or [])
         prepared_attachments = await self.prepare_attachments(
@@ -249,6 +356,7 @@ class BaseSitePlugin(AbstractPlugin):
             session_id,
             state,
             attachments,
+            request_id=request_id,
         )
         body = self.build_completion_body(
             message,
@@ -257,7 +365,6 @@ class BaseSitePlugin(AbstractPlugin):
             prepared_attachments,
         )
         body_json = json.dumps(body)
-        request_id: str = kwargs.get("request_id", "")
 
         logger.info(
             "[%s] stream_completion session_id=%s url=%s",
@@ -267,6 +374,17 @@ class BaseSitePlugin(AbstractPlugin):
         )
 
         out_message_ids: list[str] = []
+        transport_options = self.stream_transport_options(
+            context,
+            page,
+            session_id,
+            state,
+            request_id=request_id,
+            attachments=attachments,
+            proxy_url=kwargs.get("proxy_url"),
+            proxy_auth=kwargs.get("proxy_auth"),
+        )
+
         async for text in stream_completion_via_sse(
             context,
             page,
@@ -277,6 +395,8 @@ class BaseSitePlugin(AbstractPlugin):
             on_http_error=self.on_http_error,
             is_terminal_event=self.is_stream_end_event,
             collect_message_id=out_message_ids,
+            transport=self.stream_transport(),
+            transport_options=transport_options,
         ):
             yield text
 
@@ -287,9 +407,13 @@ class BaseSitePlugin(AbstractPlugin):
 
     @abstractmethod
     async def fetch_site_context(
-        self, context: BrowserContext, page: Page
+        self,
+        context: BrowserContext,
+        page: Page,
+        request_id: str = "",
     ) -> dict[str, Any] | None:
         """获取站点上下文信息（如 org_uuid、user_id 等），失败返回 None。"""
+        del request_id
         ...
 
     @abstractmethod
@@ -298,6 +422,7 @@ class BaseSitePlugin(AbstractPlugin):
         context: BrowserContext,
         page: Page,
         site_context: dict[str, Any],
+        **kwargs: Any,
     ) -> str | None:
         """调用站点 API 创建会话，返回会话 ID，失败返回 None。"""
         ...
@@ -345,8 +470,9 @@ class BaseSitePlugin(AbstractPlugin):
         session_id: str,
         state: dict[str, Any],
         attachments: list[InputAttachment],
+        request_id: str = "",
     ) -> dict[str, Any]:
-        del context, page, session_id, state, attachments
+        del context, page, session_id, state, attachments, request_id
         return {}
 
 
@@ -367,6 +493,26 @@ class PluginRegistry:
     @classmethod
     def get(cls, type_name: str) -> AbstractPlugin | None:
         return cls._plugins.get(type_name)
+
+    @classmethod
+    def resolve_model(cls, type_name: str, model: str | None) -> ResolvedModel:
+        plugin = cls.get(type_name)
+        if plugin is None:
+            raise ValueError(f"Unknown provider: {type_name}")
+        return plugin.resolve_model(model)
+
+    @classmethod
+    def model_metadata(cls, type_name: str) -> dict[str, Any]:
+        plugin = cls.get(type_name)
+        if plugin is None:
+            raise ValueError(f"Unknown provider: {type_name}")
+        mapping = plugin.listed_model_mapping()
+        return {
+            "provider": type_name,
+            "public_models": list(mapping.keys()),
+            "model_mapping": mapping,
+            "default_model": plugin.default_public_model(),
+        }
 
     @classmethod
     def all_types(cls) -> list[str]:

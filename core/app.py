@@ -5,21 +5,22 @@ FastAPI 应用组装：配置加载、账号池、会话缓存、浏览器管理
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from core.account.pool import AccountPool
 from core.api.auth import (
     AdminLoginAttemptStore,
     AdminSessionStore,
-    configured_api_keys,
     configured_config_login_lock_seconds,
     configured_config_login_max_failures,
     config_login_enabled,
     ensure_config_secret_hashed,
+    refresh_runtime_auth_settings,
 )
 from core.api.anthropic_routes import create_anthropic_router
 from core.api.chat_handler import ChatHandler
@@ -34,6 +35,7 @@ from core.runtime.browser_manager import BrowserManager
 from core.runtime.session_cache import SessionCache
 
 logger = logging.getLogger(__name__)
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 @asynccontextmanager
@@ -41,10 +43,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """启动时初始化配置与 ChatHandler，关闭时不做持久化（会话缓存进程内）。"""
     # 注册插件
     register_claude_plugin()
-    ensure_config_secret_hashed()
 
     repo = create_config_repository()
     repo.init_schema()
+    ensure_config_secret_hashed(repo)
+    app.state.config_repo = repo
+    auth_settings = refresh_runtime_auth_settings(app)
     groups = repo.load_groups()
 
     chromium_bin = (get("browser", "chromium_bin") or "").strip() or CHROMIUM_BIN
@@ -66,7 +70,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if port_count > 0
         else list(CDP_PORT_RANGE)
     )
-    api_keys = configured_api_keys()
+    api_keys = auth_settings.api_keys
     pool = AccountPool.from_groups(groups)
     session_cache = SessionCache()
     browser_manager = BrowserManager(
@@ -88,7 +92,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.session_cache = session_cache
     app.state.browser_manager = browser_manager
-    app.state.config_repo = repo
     app.state.admin_sessions = AdminSessionStore()
     app.state.admin_login_attempts = AdminLoginAttemptStore(
         max_failures=configured_config_login_max_failures(),
@@ -98,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning("数据库无配置，服务已启动但当前无可用账号")
     if api_keys:
         logger.info("API 鉴权已启用，已加载 %d 个 API Key", len(api_keys))
-    if config_login_enabled():
+    if auth_settings.config_login_enabled:
         logger.info(
             "配置页登录已启用，失败 %d 次锁定 %d 秒",
             app.state.admin_login_attempts.max_failures,
@@ -140,11 +143,15 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/", include_in_schema=False)
-    def root() -> JSONResponse:
+    def root() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/healthz", include_in_schema=False)
+    def healthz(request: Request) -> JSONResponse:
         return JSONResponse(
             {
                 "status": "ok",
-                "config_login_enabled": config_login_enabled(),
+                "config_login_enabled": config_login_enabled(request),
                 "login": "/login",
                 "config": "/config",
             }
