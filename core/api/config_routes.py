@@ -30,6 +30,7 @@ from core.api.chat_handler import ChatHandler
 from core.config.repository import (
     APP_SETTING_AUTH_API_KEY,
     APP_SETTING_AUTH_CONFIG_SECRET_HASH,
+    APP_SETTING_ENABLE_PRO_MODELS,
     ConfigRepository,
 )
 from core.plugin.base import PluginRegistry
@@ -46,6 +47,10 @@ class AdminLoginRequest(BaseModel):
 class AuthSettingsUpdateRequest(BaseModel):
     api_key: str | None = None
     admin_password: str | None = None
+
+
+class ProModelsUpdateRequest(BaseModel):
+    enabled: bool = False
 
 
 def _config_repo_of(request: Request) -> ConfigRepository:
@@ -126,6 +131,26 @@ def create_config_router() -> APIRouter:
                 token = (request.cookies.get(ADMIN_SESSION_COOKIE) or "").strip()
                 store.revoke(token)
         return {"status": "ok", "settings": settings_payload}
+
+    @router.get("/api/config/pro-models")
+    def get_pro_models(
+        request: Request, _: None = Depends(require_config_login)
+    ) -> dict[str, Any]:
+        repo = _config_repo_of(request)
+        enabled = repo.get_app_setting(APP_SETTING_ENABLE_PRO_MODELS) == "true"
+        return {"enabled": enabled}
+
+    @router.put("/api/config/pro-models")
+    def put_pro_models(
+        payload: ProModelsUpdateRequest,
+        request: Request,
+        _: None = Depends(require_config_login),
+    ) -> dict[str, Any]:
+        repo = _config_repo_of(request)
+        repo.set_app_setting(
+            APP_SETTING_ENABLE_PRO_MODELS, "true" if payload.enabled else "false"
+        )
+        return {"status": "ok", "enabled": payload.enabled}
 
     @router.get("/api/config/status")
     def get_config_status(

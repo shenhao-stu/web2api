@@ -66,9 +66,12 @@ claude:
   model_mapping:
     claude-sonnet-4-5: claude-sonnet-4-5
     claude-sonnet-4.6: claude-sonnet-4-6
+    claude-sonnet-4-5-thinking: claude-sonnet-4-5-thinking
     claude-sonnet-4-6-thinking: claude-sonnet-4-6-thinking
     claude-haiku-4-5: claude-haiku-4-5
+    claude-haiku-4-5-thinking: claude-haiku-4-5-thinking
     claude-opus-4-6: claude-opus-4-6
+    claude-opus-4-6-thinking: claude-opus-4-6-thinking
 
 mock:
   # Port for the mock server

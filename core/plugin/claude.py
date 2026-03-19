@@ -52,6 +52,16 @@ def _safe_page_url(page: Page) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _is_thinking_model(public_model: str) -> bool:
+    """Any model ending with -thinking enables extended thinking (paprika_mode)."""
+    return public_model.endswith("-thinking")
+
+
+def _base_upstream_model(public_model: str) -> str:
+    """Strip -thinking suffix to get the upstream model ID for Claude Web."""
+    return public_model.removesuffix("-thinking")
+
+
 def _default_completion_body(
     message: str,
     *,
@@ -93,15 +103,15 @@ def _default_completion_body(
         "sync_sources": [],
         "rendering_mode": "messages",
     }
-    if public_model == "claude-sonnet-4-6-thinking":
-        body["model"] = "claude-sonnet-4-6"
+    if _is_thinking_model(public_model):
+        body["model"] = _base_upstream_model(public_model)
     if not is_follow_up:
         body["create_conversation_params"] = {
             "name": "",
             "include_conversation_preferences": True,
             "is_temporary": False,
         }
-        if public_model == "claude-sonnet-4-6-thinking":
+        if _is_thinking_model(public_model):
             body["create_conversation_params"]["paprika_mode"] = "extended"
     return body
 
@@ -185,10 +195,20 @@ class ClaudePlugin(BaseSitePlugin):
     DEFAULT_MODEL_MAPPING = {
         "claude-sonnet-4-5": "claude-sonnet-4-5",
         "claude-sonnet-4.6": "claude-sonnet-4-6",
+        "claude-sonnet-4-5-thinking": "claude-sonnet-4-5-thinking",
         "claude-sonnet-4-6-thinking": "claude-sonnet-4-6-thinking",
         "claude-haiku-4-5": "claude-haiku-4-5",
+        "claude-haiku-4-5-thinking": "claude-haiku-4-5-thinking",
         "claude-opus-4-6": "claude-opus-4-6",
+        "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
     }
+    # Models that require a Claude Pro subscription.
+    PRO_MODELS = frozenset({
+        "claude-haiku-4-5",
+        "claude-haiku-4-5-thinking",
+        "claude-opus-4-6",
+        "claude-opus-4-6-thinking",
+    })
     MODEL_ALIASES = {
         "s4": "claude-sonnet-4-6",
     }
@@ -562,12 +582,12 @@ class ClaudePlugin(BaseSitePlugin):
         payload: dict[str, Any] = {
             "name": "",
             "model": (
-                "claude-sonnet-4-6"
-                if public_model == "claude-sonnet-4-6-thinking"
+                _base_upstream_model(public_model)
+                if _is_thinking_model(public_model)
                 else upstream_model
             ),
         }
-        if public_model == "claude-sonnet-4-6-thinking":
+        if _is_thinking_model(public_model):
             payload["paprika_mode"] = "extended"
         url = f"{self.api_base}/organizations/{org_uuid}/chat_conversations"
         request_id = str(kwargs.get("request_id") or "").strip()

@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from core.api.auth import require_api_key
 from core.api.chat_handler import ChatHandler
+from core.config.repository import APP_SETTING_ENABLE_PRO_MODELS
 from core.plugin.base import PluginRegistry
 from core.protocol.openai import OpenAIProtocolAdapter
 from core.protocol.schemas import CanonicalChatRequest
@@ -39,6 +40,39 @@ def resolve_request_model(
     canonical_req.model = resolved.public_model
     canonical_req.metadata["upstream_model"] = resolved.upstream_model
     return canonical_req
+
+
+def check_pro_model_access(
+    request: Request,
+    provider: str,
+    model: str,
+) -> JSONResponse | None:
+    """Return 403 JSONResponse if model requires Pro and Pro is disabled, else None."""
+    plugin = PluginRegistry.get(provider)
+    if plugin is None:
+        return None
+    pro_models = getattr(plugin, "PRO_MODELS", frozenset())
+    if model not in pro_models:
+        return None
+    config_repo = getattr(request.app.state, "config_repo", None)
+    if config_repo is None:
+        return None
+    enabled = config_repo.get_app_setting(APP_SETTING_ENABLE_PRO_MODELS)
+    if enabled == "true":
+        return None
+    return JSONResponse(
+        status_code=403,
+        content={
+            "error": {
+                "message": (
+                    f"Model '{model}' requires a Claude Pro subscription. "
+                    "Enable Pro models in the config page at /config."
+                ),
+                "type": "model_not_available",
+                "code": "pro_model_required",
+            }
+        },
+    )
 
 
 def create_router() -> APIRouter:
@@ -87,6 +121,10 @@ def create_router() -> APIRouter:
         except Exception as exc:
             status, payload = adapter.render_error(exc)
             return JSONResponse(status_code=status, content=payload)
+
+        pro_err = check_pro_model_access(request, provider, canonical_req.model)
+        if pro_err is not None:
+            return pro_err
 
         service = CanonicalChatService(handler)
         if canonical_req.stream:

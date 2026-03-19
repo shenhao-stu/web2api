@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from core.api.auth import require_api_key
 from core.api.chat_handler import ChatHandler
-from core.api.routes import get_chat_handler, resolve_request_model
+from core.api.routes import get_chat_handler, resolve_request_model, check_pro_model_access
 from core.protocol.anthropic import AnthropicProtocolAdapter
 from core.protocol.service import CanonicalChatService
 
@@ -26,6 +26,21 @@ def create_anthropic_router() -> APIRouter:
         request: Request,
         handler: ChatHandler = Depends(get_chat_handler),
     ) -> Any:
+        return await _messages(provider, request, handler)
+
+    @router.post("/{provider}/v1/messages")
+    async def messages_legacy(
+        provider: str,
+        request: Request,
+        handler: ChatHandler = Depends(get_chat_handler),
+    ) -> Any:
+        return await _messages(provider, request, handler)
+
+    async def _messages(
+        provider: str,
+        request: Request,
+        handler: ChatHandler,
+    ) -> Any:
         raw_body = await request.json()
         try:
             canonical_req = resolve_request_model(
@@ -35,6 +50,10 @@ def create_anthropic_router() -> APIRouter:
         except Exception as exc:
             status, payload = adapter.render_error(exc)
             return JSONResponse(status_code=status, content=payload)
+
+        pro_err = check_pro_model_access(request, provider, canonical_req.model)
+        if pro_err is not None:
+            return pro_err
 
         service = CanonicalChatService(handler)
         if canonical_req.stream:

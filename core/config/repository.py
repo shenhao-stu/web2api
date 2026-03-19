@@ -18,6 +18,7 @@ DB_FILENAME = "db.sqlite3"
 DB_PATH_ENV_KEY = "WEB2API_DB_PATH"
 APP_SETTING_AUTH_API_KEY = "auth.api_key"
 APP_SETTING_AUTH_CONFIG_SECRET_HASH = "auth.config_secret_hash"
+APP_SETTING_ENABLE_PRO_MODELS = "claude.enable_pro_models"
 
 
 def _get_db_path() -> Path:

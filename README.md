@@ -14,49 +14,54 @@ Bridge Claude Web sessions to OpenAI / Anthropic compatible APIs. Runs as a Dock
 
 ## Endpoints
 
-| Path | Description |
-|------|-------------|
-| `/` | Landing page |
-| `/login` | Authenticate to access config |
-| `/config` | Manage proxy groups & accounts |
-| `/claude/v1/models` | List available models |
-| `/claude/v1/chat/completions` | Chat completions (OpenAI format) |
+| Path | Protocol | Description |
+|------|----------|-------------|
+| `/claude/v1/models` | OpenAI | List available models |
+| `/claude/v1/chat/completions` | OpenAI | Chat completions |
+| `/claude/v1/messages` | Anthropic | Messages API |
+| `/config` | — | Admin dashboard |
 
 ## Supported models
 
-| Model ID | Upstream | Notes |
-|----------|----------|-------|
-| `claude-sonnet-4.6` | claude-sonnet-4-6 | Sonnet 4.6 (default) |
-| `claude-sonnet-4-5` | claude-sonnet-4-5 | Sonnet 4.5 |
-| `claude-sonnet-4-6-thinking` | claude-sonnet-4-6 | Extended thinking enabled |
-| `claude-haiku-4-5` | claude-haiku-4-5 | Haiku 4.5 (fastest) |
-| `claude-opus-4-6` | claude-opus-4-6 | Opus 4.6 (most capable) |
+| Model ID | Upstream | Tier | Notes |
+|----------|----------|------|-------|
+| `claude-sonnet-4.6` | claude-sonnet-4-6 | Free | Sonnet 4.6 (default) |
+| `claude-sonnet-4-5` | claude-sonnet-4-5 | Free | Sonnet 4.5 |
+| `claude-sonnet-4-6-thinking` | claude-sonnet-4-6 | Free | Sonnet 4.6 extended thinking |
+| `claude-sonnet-4-5-thinking` | claude-sonnet-4-5 | Free | Sonnet 4.5 extended thinking |
+| `claude-haiku-4-5` | claude-haiku-4-5 | Pro | Haiku 4.5 (fastest) |
+| `claude-haiku-4-5-thinking` | claude-haiku-4-5 | Pro | Haiku 4.5 extended thinking |
+| `claude-opus-4-6` | claude-opus-4-6 | Pro | Opus 4.6 (most capable) |
+| `claude-opus-4-6-thinking` | claude-opus-4-6 | Pro | Opus 4.6 extended thinking |
+
+Pro models require a Claude Pro subscription and must be enabled in the config page.
 
 ## Quick start
 
 1. Set required secrets in Space settings
 2. Open `/login` → `/config`
 3. Add a proxy group and a Claude account with `auth.sessionKey`
-4. Call the API:
+4. (Optional) Enable Pro models toggle if your account has a Pro subscription
+5. Call the API:
 
 ```bash
-# Standard completion
+# OpenAI format (streaming)
 curl $SPACE_URL/claude/v1/chat/completions \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4.6","stream":true,"messages":[{"role":"user","content":"Hello"}]}'
 
-# Sonnet 4.5
-curl $SPACE_URL/claude/v1/chat/completions \
+# Anthropic format (streaming)
+curl $SPACE_URL/claude/v1/messages \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-5","stream":true,"messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"claude-sonnet-4.6","stream":true,"max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'
 
-# Thinking model
+# Extended thinking
 curl $SPACE_URL/claude/v1/chat/completions \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-6-thinking","stream":true,"messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"claude-sonnet-4-6-thinking","stream":true,"messages":[{"role":"user","content":"Solve this step by step: what is 23 * 47?"}]}'
 ```
 
 ## Required secrets
