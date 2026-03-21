@@ -211,7 +211,16 @@ class ClaudePlugin(BaseSitePlugin):
     })
     MODEL_ALIASES = {
         "s4": "claude-sonnet-4-6",
+        # dot-notation aliases (e.g. 4.6 / 4.5) → canonical dash form
         "claude-sonnet-4.6": "claude-sonnet-4-6",
+        "claude-sonnet-4.5": "claude-sonnet-4-5",
+        "claude-opus-4.6": "claude-opus-4-6",
+        "claude-haiku-4.5": "claude-haiku-4-5",
+        # thinking variants
+        "claude-sonnet-4.6-thinking": "claude-sonnet-4-6-thinking",
+        "claude-sonnet-4.5-thinking": "claude-sonnet-4-5-thinking",
+        "claude-opus-4.6-thinking": "claude-opus-4-6-thinking",
+        "claude-haiku-4.5-thinking": "claude-haiku-4-5-thinking",
     }
 
     site = SiteConfig(

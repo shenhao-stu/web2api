@@ -39,6 +39,12 @@ _BROWSER_RESOURCE_ERROR_PATTERNS: tuple[tuple[str, str, str], ...] = (
     ("connection closed", "browser", "browser_disconnected"),
     ("connection terminated", "browser", "browser_disconnected"),
     ("has been disconnected", "browser", "browser_disconnected"),
+    # Proxy / network tunnel errors — retryable via browser re-launch
+    ("err_tunnel_connection_failed", "browser", "proxy_tunnel_failed"),
+    ("err_proxy_connection_failed", "browser", "proxy_connection_failed"),
+    ("err_connection_refused", "browser", "connection_refused"),
+    ("err_connection_timed_out", "browser", "connection_timed_out"),
+    ("err_connection_reset", "browser", "connection_reset"),
 )
 
 
