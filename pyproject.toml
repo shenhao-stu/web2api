@@ -1,0 +1,26 @@
+[project]
+name = "web2api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "curl-cffi>=0.14.0",
+    "fastapi>=0.128.8",
+    "playwright>=1.58.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.12.5",
+    "pytz>=2025.2",
+    "uvicorn[standard]>=0.40.0",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg[binary]>=3.2.9",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.0",
+]

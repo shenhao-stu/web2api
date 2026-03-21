@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web2API</title>
+    <style>
+      :root {
+        --bg: #120f0d;
+        --bg-deep: #090705;
+        --panel: rgba(28, 23, 20, 0.84);
+        --panel-strong: rgba(37, 31, 27, 0.94);
+        --line: rgba(247, 239, 230, 0.12);
+        --text: #f7efe6;
+        --muted: #b8ab99;
+        --accent: #e5c49a;
+        --accent-strong: #f2ddc3;
+        --success: #a9d7b8;
+        --shadow: 0 32px 100px rgba(0, 0, 0, 0.42);
+        --radius: 28px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(229, 196, 154, 0.16), transparent 32%),
+          radial-gradient(circle at 85% 10%, rgba(163, 120, 76, 0.18), transparent 22%),
+          linear-gradient(180deg, #171210 0%, var(--bg) 42%, var(--bg-deep) 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.18;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 100% 3px;
+        mix-blend-mode: soft-light;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+      }
+
+      .shell {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      .panel {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(43, 36, 31, 0.88), rgba(26, 21, 18, 0.9));
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .panel::after {
+        content: "";
+        position: absolute;
+        inset: auto -10% 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(242, 221, 195, 0.22), transparent);
+      }
+
+      .hero {
+        padding: 34px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(229, 196, 154, 0.2);
+        background: rgba(229, 196, 154, 0.08);
+        color: var(--accent);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        letter-spacing: -0.03em;
+      }
+
+      h1 {
+        margin: 18px 0 14px;
+        max-width: 780px;
+        font-size: clamp(2.8rem, 6vw, 5rem);
+        line-height: 0.96;
+      }
+
+      .lede {
+        max-width: 720px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.02rem;
+        line-height: 1.8;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 148px;
+        padding: 12px 18px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(250, 245, 238, 0.04);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 600;
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          background 0.18s ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(242, 221, 195, 0.28);
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, #f2ddc3, #ddbb8e);
+        color: #1a140f;
+        border-color: transparent;
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .stat {
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: rgba(250, 245, 238, 0.03);
+      }
+
+      .stat-label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 1.05rem;
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .section {
+        padding: 28px 30px;
+      }
+
+      .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 2rem;
+      }
+
+      .section-head p {
+        margin: 0;
+        max-width: 560px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .model-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+
+      .model-card {
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: rgba(250, 245, 238, 0.03);
+      }
+
+      .model-card .kicker {
+        display: inline-flex;
+        margin-bottom: 10px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(169, 215, 184, 0.12);
+        color: var(--success);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .model-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.1rem;
+      }
+
+      .meta-line {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: 18px;
+      }
+
+      .code-block {
+        margin: 0;
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: #0f0c0a;
+        color: #f4e7d6;
+        overflow: auto;
+        line-height: 1.7;
+      }
+
+      .route-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .route-list li {
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(250, 245, 238, 0.03);
+      }
+
+      .route-list code {
+        color: var(--accent-strong);
+      }
+
+      .note {
+        margin-top: 14px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .empty {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed var(--line);
+        color: var(--muted);
+      }
+
+      @media (max-width: 860px) {
+        .shell {
+          width: min(100vw - 20px, 1120px);
+          padding-top: 18px;
+        }
+
+        .hero,
+        .section {
+          padding: 22px;
+        }
+
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel hero">
+        <div class="eyebrow">Hosted bridge</div>
+        <h1>Claude Web accounts, exposed as clean API routes.</h1>
+        <p class="lede">
+          Web2API turns browser-authenticated Claude sessions into OpenAI-compatible and
+          Anthropic-compatible endpoints, with a compact admin dashboard for proxy groups,
+          account auth, runtime status, and persistent global auth settings.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="/login">Open dashboard</a>
+          <a class="button" href="#supported-models">Supported models</a>
+          <a class="button" href="/healthz">View health JSON</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-label">Provider</span>
+            <strong>claude</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Default model</span>
+            <strong id="defaultModel">Loading…</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Config dashboard</span>
+            <strong id="dashboardStatus">Checking…</strong>
+          </div>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="panel section" id="supported-models">
+          <div class="section-head">
+            <div>
+              <h2>Supported models</h2>
+            </div>
+            <p>
+              Public model IDs are accepted on both OpenAI-compatible and Anthropic-compatible
+              routes. The cards below show the exact public → upstream mapping used by the server.
+            </p>
+          </div>
+          <div id="modelsList" class="model-grid">
+            <div class="empty">Loading supported models…</div>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <div class="section-head">
+            <div>
+              <h2>Quick start</h2>
+            </div>
+            <p>
+              Point your client to the OpenAI-compatible route, then use one of the public model IDs
+              from the list above.
+            </p>
+          </div>
+          <div class="split">
+            <pre class="code-block"><code>curl https://YOUR_HOST/openai/claude/v1/chat/completions \
+  -H "Authorization: Bearer $WEB2API_AUTH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4.6",
+    "messages": [
+      {"role": "user", "content": "Hello from Web2API"}
+    ]
+  }'</code></pre>
+            <div>
+              <ul class="route-list">
+                <li><code>POST /openai/claude/v1/chat/completions</code></li>
+                <li><code>POST /claude/v1/chat/completions</code></li>
+                <li><code>POST /anthropic/claude/v1/messages</code></li>
+                <li><code>GET /api/models/claude/metadata</code></li>
+                <li><code>GET /healthz</code></li>
+              </ul>
+              <p class="note">
+                Use <code>/config</code> after signing in to edit proxy groups, account JSON auth, API
+                keys, and the admin password.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const defaultModelEl = document.getElementById('defaultModel')
+      const dashboardStatusEl = document.getElementById('dashboardStatus')
+      const modelsListEl = document.getElementById('modelsList')
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+      }
+
+      function renderModels(metadata) {
+        const mapping = (metadata && metadata.model_mapping) || {}
+        const entries = Object.entries(mapping)
+        defaultModelEl.textContent = (metadata && metadata.default_model) || 'Unavailable'
+        if (!entries.length) {
+          modelsListEl.innerHTML = '<div class="empty">No model metadata available.</div>'
+          return
+        }
+        modelsListEl.innerHTML = entries
+          .map(
+            ([publicModel, upstreamModel]) => `
+              <article class="model-card">
+                ${
+                  publicModel === metadata.default_model
+                    ? '<span class="kicker">Default</span>'
+                    : '<span class="kicker">Available</span>'
+                }
+                <h3><code>${escapeHtml(publicModel)}</code></h3>
+                <p class="meta-line">Accepted public ID for client requests.</p>
+                <p class="meta-line"><strong>Upstream:</strong> <code>${escapeHtml(upstreamModel)}</code></p>
+              </article>
+            `
+          )
+          .join('')
+      }
+
+      async function loadMetadata() {
+        try {
+          const res = await fetch('/api/models/claude/metadata')
+          if (!res.ok) throw new Error(await res.text())
+          renderModels(await res.json())
+        } catch (error) {
+          defaultModelEl.textContent = 'Unavailable'
+          modelsListEl.innerHTML = '<div class="empty">Failed to load model metadata.</div>'
+        }
+      }
+
+      async function loadHealth() {
+        try {
+          const res = await fetch('/healthz')
+          if (!res.ok) throw new Error(await res.text())
+          const data = await res.json()
+          dashboardStatusEl.textContent = data.config_login_enabled
+            ? 'Enabled at /login'
+            : 'Disabled'
+        } catch (_) {
+          dashboardStatusEl.textContent = 'Unavailable'
+        }
+      }
+
+      void Promise.all([loadMetadata(), loadHealth()])
+    </script>
+  </body>
+</html>

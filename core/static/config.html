@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web2API configuration</title>
+    <style>
+      :root {
+        --bg: #120f0d;
+        --bg-deep: #080706;
+        --panel: rgba(28, 23, 20, 0.88);
+        --panel-strong: rgba(38, 32, 27, 0.96);
+        --line: rgba(247, 239, 230, 0.12);
+        --line-strong: rgba(247, 239, 230, 0.18);
+        --text: #f7efe6;
+        --muted: #b7aa98;
+        --accent: #efd9bc;
+        --accent-strong: #ddb98a;
+        --success-bg: rgba(22, 101, 52, 0.26);
+        --success-text: #c8f2d6;
+        --danger-bg: rgba(127, 29, 29, 0.3);
+        --danger-text: #fecaca;
+        --warning-bg: rgba(124, 45, 18, 0.32);
+        --warning-text: #fed7aa;
+        --shadow: 0 32px 100px rgba(0, 0, 0, 0.42);
+        --radius: 28px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(239, 217, 188, 0.14), transparent 28%),
+          radial-gradient(circle at 85% 8%, rgba(163, 120, 76, 0.16), transparent 20%),
+          linear-gradient(180deg, #171210 0%, var(--bg) 38%, var(--bg-deep) 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.12;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 100% 3px;
+      }
+
+      code,
+      textarea,
+      pre {
+        font-family: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        letter-spacing: -0.03em;
+      }
+
+      .shell {
+        width: min(1280px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 22px 0 44px;
+      }
+
+      .panel {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, rgba(41, 34, 30, 0.94), rgba(24, 20, 17, 0.9));
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .panel::after {
+        content: "";
+        position: absolute;
+        inset: auto -10% 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(247, 239, 230, 0.22), transparent);
+      }
+
+      .hero {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 28px;
+      }
+
+      .hero-copy {
+        max-width: 720px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(239, 217, 188, 0.18);
+        background: rgba(239, 217, 188, 0.08);
+        color: var(--accent-strong);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 10px;
+        font-size: clamp(2.4rem, 5vw, 4.25rem);
+        line-height: 0.96;
+      }
+
+      .hero-copy p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.16s ease,
+          border-color 0.16s ease,
+          background 0.16s ease;
+      }
+
+      .btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
+      }
+
+      .btn:disabled {
+        opacity: 0.62;
+        cursor: wait;
+      }
+
+      .btn-primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #1a140f;
+      }
+
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fecaca;
+        border-color: rgba(248, 113, 113, 0.22);
+      }
+
+      .btn-sm {
+        min-height: 34px;
+        padding: 0 14px;
+        font-size: 12px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .top-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 18px;
+      }
+
+      .section {
+        padding: 24px;
+      }
+
+      .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 1.9rem;
+      }
+
+      .section-head p,
+      .field-note,
+      .meta,
+      .stats,
+      .empty {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .pill strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .field.span-2 {
+        grid-column: span 2;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(9, 8, 7, 0.42);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 112px;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: rgba(239, 217, 188, 0.32);
+        box-shadow: 0 0 0 4px rgba(239, 217, 188, 0.08);
+      }
+
+      input[readonly],
+      textarea[readonly] {
+        color: var(--muted);
+      }
+
+      .inline-state {
+        display: flex;
+        align-items: center;
+        min-height: 48px;
+        padding: 0 14px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+      }
+
+      .sub-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .models-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .model-card {
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .model-card .kicker {
+        display: inline-flex;
+        margin-bottom: 10px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(169, 215, 184, 0.12);
+        color: #cdebd6;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .model-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.08rem;
+      }
+
+      .search-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: end;
+      }
+
+      .stats {
+        padding-bottom: 2px;
+        white-space: nowrap;
+      }
+
+      .hint,
+      .warn {
+        padding: 14px 16px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        line-height: 1.75;
+      }
+
+      .hint {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .warn {
+        margin-bottom: 14px;
+        background: var(--warning-bg);
+        border-color: rgba(251, 146, 60, 0.22);
+        color: var(--warning-text);
+      }
+
+      .group {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(36, 30, 26, 0.96), rgba(21, 18, 15, 0.88));
+        padding: 20px;
+      }
+
+      .group + .group {
+        margin-top: 16px;
+      }
+
+      .group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .group-header h3 {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.18rem;
+      }
+
+      .group-header .meta {
+        margin-top: 4px;
+      }
+
+      .chevron {
+        display: inline-flex;
+        transition: transform 0.18s ease;
+      }
+
+      .group.collapsed .chevron {
+        transform: rotate(-90deg);
+      }
+
+      .group.collapsed .group-body,
+      .group.collapsed .accounts {
+        display: none;
+      }
+
+      .group-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .row.proxy-one-row {
+        grid-template-columns: 1fr 2fr 4fr 2fr 1.3fr 2fr;
+      }
+
+      .accounts {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .accounts-head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .accounts-head h4 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .account {
+        position: relative;
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(10, 9, 8, 0.42);
+      }
+
+      .account + .account {
+        margin-top: 12px;
+      }
+
+      .account-status-badge {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .account-status-badge.active {
+        background: rgba(20, 83, 45, 0.36);
+        color: #c8f2d6;
+        border-color: rgba(74, 222, 128, 0.16);
+      }
+
+      .account-status-badge.frozen {
+        background: rgba(127, 29, 29, 0.36);
+        color: #fecaca;
+        border-color: rgba(248, 113, 113, 0.2);
+      }
+
+      .account-status-badge.disabled {
+        background: rgba(63, 63, 70, 0.36);
+        color: #e4e4e7;
+        border-color: rgba(212, 212, 216, 0.12);
+      }
+
+      .account-status-badge.idle {
+        background: rgba(30, 41, 59, 0.36);
+        color: #dbe7f5;
+        border-color: rgba(148, 163, 184, 0.16);
+      }
+
+      .account-row1 {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 12px;
+        margin-bottom: 12px;
+        padding-top: 26px;
+      }
+
+      .account-row1 .f {
+        min-width: 120px;
+      }
+
+      .account-row1 .f.name {
+        min-width: 120px;
+        max-width: 180px;
+      }
+
+      .account-row1 .f.freeze-time {
+        min-width: 220px;
+      }
+
+      .account-row2 .f {
+        width: 100%;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        margin: 0;
+        color: var(--text);
+      }
+
+      .toggle input {
+        width: auto;
+        margin: 0;
+      }
+
+      .pagination {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .pagination .info {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .msg {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        display: none;
+        min-width: 260px;
+        max-width: min(560px, calc(100vw - 24px));
+        padding: 13px 16px;
+        border-radius: 16px;
+        border: 1px solid transparent;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      .msg.success {
+        background: var(--success-bg);
+        color: var(--success-text);
+        border-color: rgba(74, 222, 128, 0.12);
+      }
+
+      .msg.error {
+        background: var(--danger-bg);
+        color: var(--danger-text);
+        border-color: rgba(248, 113, 113, 0.18);
+      }
+
+      .empty {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed var(--line);
+      }
+
+      @media (max-width: 1120px) {
+        .top-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .row.proxy-one-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          width: min(100vw - 18px, 1280px);
+          padding-top: 14px;
+        }
+
+        .hero,
+        .section,
+        .group {
+          padding: 18px;
+        }
+
+        .field-grid,
+        .search-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .field.span-2 {
+          grid-column: span 1;
+        }
+
+        .toolbar {
+          width: 100%;
+          justify-content: flex-start;
+        }
+
+        .btn {
+          width: 100%;
+        }
+
+        .group-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="msg" class="msg"></div>
+
+    <main class="shell">
+      <section class="panel hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Admin dashboard</div>
+          <h1>Web2API configuration</h1>
+          <p>
+            Manage proxy groups, account auth JSON, global API keys, the admin password, and the
+            public model mapping used by this bridge.
+          </p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-primary" id="addGroup">Add proxy group</button>
+          <button type="button" class="btn" id="load">Reload</button>
+          <button type="button" class="btn btn-primary" id="save">Save config</button>
+          <button type="button" class="btn" id="logout">Logout</button>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="top-grid">
+          <article class="panel section">
+            <div class="section-head">
+              <div>
+                <h2>Global auth settings</h2>
+              </div>
+              <p>
+                Database-backed values persist across restarts and take precedence once saved here.
+                Environment variables are used as the initial fallback when the database has no value.
+              </p>
+            </div>
+            <div class="pill-row">
+              <div class="pill" id="apiKeySourceBadge">API key source</div>
+              <div class="pill" id="adminPasswordSourceBadge">Admin password source</div>
+            </div>
+            <div class="field-grid">
+              <div class="field span-2">
+                <label for="globalApiKey">API keys</label>
+                <textarea
+                  id="globalApiKey"
+                  placeholder="One key per line, or use comma-separated values"
+                ></textarea>
+                <p class="field-note" id="apiKeyHint"></p>
+              </div>
+              <div class="field">
+                <label for="globalAdminPassword">New admin password</label>
+                <input
+                  id="globalAdminPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="Leave blank to keep the current password"
+                />
+                <p class="field-note" id="adminPasswordHint"></p>
+              </div>
+              <div class="field">
+                <label>Dashboard status</label>
+                <div class="inline-state" id="adminPasswordState">Loading…</div>
+                <p class="field-note">Saving a new password signs out the current dashboard session.</p>
+              </div>
+            </div>
+            <div class="sub-actions">
+              <button type="button" class="btn btn-primary" id="saveAuthSettings">
+                Save auth settings
+              </button>
+              <button type="button" class="btn btn-danger" id="clearAdminPassword">
+                Disable dashboard password
+              </button>
+            </div>
+          </article>
+
+          <article class="panel section">
+            <div class="section-head">
+              <div>
+                <h2>Supported models</h2>
+              </div>
+              <p>
+                These public IDs are exposed to clients and resolved to the upstream Claude model IDs
+                shown below.
+              </p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:0 4px;">
+              <label style="margin:0;font-weight:500;font-size:0.92em;cursor:pointer;" for="proModelsToggle">
+                Enable Pro models (Haiku, Opus)
+              </label>
+              <input type="checkbox" id="proModelsToggle" style="width:18px;height:18px;cursor:pointer;" />
+              <span id="proModelsStatus" style="font-size:0.85em;color:#888;">Loading…</span>
+            </div>
+            <div id="modelsList" class="models-list">
+              <div class="empty">Loading model metadata…</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel section">
+          <div class="search-grid">
+            <div>
+              <label for="search">Search groups or accounts</label>
+              <input
+                type="text"
+                id="search"
+                placeholder="Filter by proxy host, proxy user, account name, or type"
+              />
+            </div>
+            <div class="stats" id="stats"></div>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <div class="hint">
+            <strong>Network mode:</strong> When <em>Use proxy</em> is enabled, the browser goes out
+            through the configured proxy. When disabled, the browser uses this machine’s own exit IP.
+            Avoid packing many accounts into one direct-connection group, or the upstream site may
+            link them together by IP.
+          </div>
+          <div id="list"></div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const API = '/api/config'
+      const STATUS_API = '/api/config/status'
+      const TYPES_API = '/api/types'
+      const AUTH_SETTINGS_API = '/api/config/auth-settings'
+      const MODELS_API = '/api/config/models'
+
+      const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+      const DEFAULT_PAGE_SIZE = 20
+
+      let registeredTypes = ['claude']
+      let runtimeStatus = {}
+      let runtimeNow = null
+      let authSettings = null
+      let modelMetadata = null
+      let config = []
+      let groupCollapsed = {}
+      let groupPage = {}
+      let groupPageSize = {}
+
+      const TIMEZONES = (() => {
+        if (typeof Intl !== 'undefined' && Intl.supportedValuesOf) {
+          try {
+            return Intl.supportedValuesOf('timeZone').sort()
+          } catch (_) {}
+        }
+        return [
+          'Africa/Cairo',
+          'Africa/Johannesburg',
+          'Africa/Lagos',
+          'Africa/Nairobi',
+          'Africa/Tunis',
+          'America/Argentina/Buenos_Aires',
+          'America/Bogota',
+          'America/Chicago',
+          'America/Denver',
+          'America/Lima',
+          'America/Los_Angeles',
+          'America/Mexico_City',
+          'America/New_York',
+          'America/Santiago',
+          'America/Sao_Paulo',
+          'America/Toronto',
+          'America/Vancouver',
+          'Asia/Bangkok',
+          'Asia/Colombo',
+          'Asia/Dubai',
+          'Asia/Ho_Chi_Minh',
+          'Asia/Hong_Kong',
+          'Asia/Jakarta',
+          'Asia/Jerusalem',
+          'Asia/Karachi',
+          'Asia/Kolkata',
+          'Asia/Manila',
+          'Asia/Seoul',
+          'Asia/Shanghai',
+          'Asia/Singapore',
+          'Asia/Taipei',
+          'Asia/Tehran',
+          'Asia/Tokyo',
+          'Australia/Adelaide',
+          'Australia/Melbourne',
+          'Australia/Perth',
+          'Australia/Sydney',
+          'Europe/Amsterdam',
+          'Europe/Athens',
+          'Europe/Berlin',
+          'Europe/Istanbul',
+          'Europe/London',
+          'Europe/Madrid',
+          'Europe/Moscow',
+          'Europe/Paris',
+          'Europe/Rome',
+          'Europe/Stockholm',
+          'Pacific/Auckland',
+          'Pacific/Fiji',
+          'Pacific/Guam',
+          'Pacific/Honolulu',
+          'UTC',
+        ].sort()
+      })()
+
+      function escapeAttr(value) {
+        if (value == null) return ''
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+      }
+
+      function describeSource(source) {
+        if (source === 'env') return 'Environment'
+        if (source === 'db') return 'Database'
+        if (source === 'yaml') return 'YAML'
+        return 'Default'
+      }
+
+      function setButtonBusy(button, busy, busyLabel, idleLabel) {
+        if (!button) return
+        button.disabled = !!busy
+        button.textContent = busy ? busyLabel : idleLabel
+      }
+
+      async function parseResponse(res) {
+        const text = await res.text()
+        let data = null
+        try {
+          data = text ? JSON.parse(text) : null
+        } catch (_) {}
+        return { text, data }
+      }
+
+      async function apiFetch(url, options = {}) {
+        const res = await fetch(url, options)
+        if (res.status === 401) {
+          window.location.href = '/login'
+          throw new Error('Your dashboard session has expired. Please sign in again.')
+        }
+        return res
+      }
+
+      function showMsg(text, type = 'success') {
+        const el = document.getElementById('msg')
+        el.className = 'msg ' + type
+        el.textContent = text
+        el.style.display = 'block'
+        clearTimeout(showMsg._timer)
+        showMsg._timer = setTimeout(() => {
+          el.style.display = 'none'
+        }, 4200)
+      }
+
+      async function loadTypes() {
+        try {
+          const res = await apiFetch(TYPES_API)
+          if (!res.ok) return
+          const list = await res.json()
+          if (Array.isArray(list) && list.length) registeredTypes = list
+        } catch (_) {}
+      }
+
+      async function loadConfig() {
+        const res = await apiFetch(API)
+        const payload = await parseResponse(res)
+        if (!res.ok) throw new Error((payload.data && payload.data.detail) || payload.text || res.statusText)
+        return payload.data
+      }
+
+      async function loadStatus() {
+        const res = await apiFetch(STATUS_API)
+        const payload = await parseResponse(res)
+        if (!res.ok) throw new Error((payload.data && payload.data.detail) || payload.text || res.statusText)
+        return payload.data
+      }
+
+      async function loadAuthSettings() {
+        const res = await apiFetch(AUTH_SETTINGS_API)
+        const payload = await parseResponse(res)
+        if (!res.ok) throw new Error((payload.data && payload.data.detail) || payload.text || res.statusText)
+        return payload.data
+      }
+
+      async function loadModelMetadata() {
+        const res = await apiFetch(MODELS_API)
+        const payload = await parseResponse(res)
+        if (!res.ok) throw new Error((payload.data && payload.data.detail) || payload.text || res.statusText)
+        return payload.data
+      }
+
+      function authToStr(auth) {
+        if (auth == null || typeof auth !== 'object') return '{}'
+        try {
+          return JSON.stringify(auth, null, 2)
+        } catch {
+          return '{}'
+        }
+      }
+
+      function parseAuth(text) {
+        if (typeof text !== 'string' || !text.trim()) return {}
+        try {
+          const parsed = JSON.parse(text)
+          return typeof parsed === 'object' && parsed !== null ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+
+      function asUnix(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+        if (typeof value === 'string' && value.trim()) {
+          const n = Number(value)
+          if (Number.isFinite(n)) return Math.trunc(n)
+        }
+        return null
+      }
+
+      function formatDateTime(value) {
+        const ts = asUnix(value)
+        if (ts == null || ts <= 0) return '—'
+        try {
+          return new Date(ts * 1000).toLocaleString(undefined, { hour12: false })
+        } catch (_) {
+          return String(ts)
+        }
+      }
+
+      function applyRuntimeStatus(payload) {
+        runtimeStatus = (payload && payload.accounts) || {}
+        runtimeNow =
+          payload && typeof payload.now === 'number' ? payload.now : Math.trunc(Date.now() / 1000)
+      }
+
+      function accountId(group, account) {
+        return `${group.fingerprint_id || ''}:${account.name || ''}`
+      }
+
+      function getAccountBadge(group, account) {
+        const enabled = account.enabled !== false
+        const runtime = runtimeStatus[accountId(group, account)] || null
+        const isActive = !!(runtime && runtime.is_active)
+        const unfreezeAt = asUnix(
+          runtime && runtime.unfreeze_at != null ? runtime.unfreeze_at : account.unfreeze_at
+        )
+        const now = runtimeNow || Math.trunc(Date.now() / 1000)
+        const isFrozen = unfreezeAt != null && unfreezeAt > now
+        if (!enabled) return { className: 'disabled', text: 'Disabled' }
+        if (isActive) return { className: 'active', text: 'Active' }
+        if (isFrozen) return { className: 'frozen', text: 'Frozen' }
+        return { className: 'idle', text: 'Idle' }
+      }
+
+      function renderAuthSettings(data) {
+        authSettings = data || null
+        const apiKeyEl = document.getElementById('globalApiKey')
+        const apiKeyHintEl = document.getElementById('apiKeyHint')
+        const apiKeySourceBadge = document.getElementById('apiKeySourceBadge')
+        const adminPasswordEl = document.getElementById('globalAdminPassword')
+        const adminPasswordHintEl = document.getElementById('adminPasswordHint')
+        const adminPasswordSourceBadge = document.getElementById('adminPasswordSourceBadge')
+        const adminPasswordStateEl = document.getElementById('adminPasswordState')
+        const clearAdminPasswordBtn = document.getElementById('clearAdminPassword')
+
+        if (!data) {
+          apiKeyEl.value = ''
+          apiKeyEl.disabled = true
+          adminPasswordEl.value = ''
+          adminPasswordEl.disabled = true
+          clearAdminPasswordBtn.disabled = true
+          apiKeyHintEl.textContent = 'Failed to load auth settings.'
+          adminPasswordHintEl.textContent = 'Failed to load auth settings.'
+          adminPasswordStateEl.textContent = 'Unavailable'
+          apiKeySourceBadge.innerHTML = '<strong>API keys</strong> Unavailable'
+          adminPasswordSourceBadge.innerHTML = '<strong>Admin password</strong> Unavailable'
+          return
+        }
+
+        apiKeyEl.value = data.api_key || ''
+        apiKeyEl.disabled = false
+        apiKeySourceBadge.innerHTML = `<strong>API keys</strong> ${describeSource(data.api_key_source)}`
+        apiKeyHintEl.textContent = data.api_key_source === 'env'
+          ? 'Currently using WEB2API_AUTH_API_KEY as the fallback value. Saving here writes to the database and takes precedence from then on.'
+          : 'Accepts one key per line, or a comma-separated list.'
+
+        adminPasswordEl.value = ''
+        adminPasswordEl.disabled = false
+        clearAdminPasswordBtn.disabled = false
+        adminPasswordSourceBadge.innerHTML = `<strong>Admin password</strong> ${describeSource(
+          data.admin_password_source
+        )}`
+        adminPasswordHintEl.textContent = data.admin_password_source === 'env'
+          ? 'Currently using WEB2API_AUTH_CONFIG_SECRET as the fallback value. Saving here writes to the database and takes precedence from then on.'
+          : 'Enter a new password only when you want to rotate it.'
+        adminPasswordStateEl.textContent = data.admin_password_configured
+          ? 'Dashboard password is enabled.'
+          : 'Dashboard password is disabled.'
+      }
+
+      function renderModels(metadata) {
+        modelMetadata = metadata || null
+        const list = document.getElementById('modelsList')
+        const mapping = (metadata && metadata.model_mapping) || {}
+        const entries = Object.entries(mapping)
+        if (!entries.length) {
+          list.innerHTML = '<div class="empty">No model metadata available.</div>'
+          return
+        }
+        list.innerHTML = entries
+          .map(
+            ([publicModel, upstreamModel]) => `
+              <article class="model-card">
+                <div class="kicker">${
+                  publicModel === metadata.default_model ? 'Default model' : 'Available model'
+                }</div>
+                <h3><code>${escapeAttr(publicModel)}</code></h3>
+                <p class="meta">Public model ID accepted by client requests.</p>
+                <p class="meta"><strong>Upstream:</strong> <code>${escapeAttr(upstreamModel)}</code></p>
+              </article>
+            `
+          )
+          .join('')
+      }
+
+      function renderAccount(account, accountIndex, group, onRemove, onChange) {
+        const currentType = account.type || 'claude'
+        const typeOptions = registeredTypes.includes(currentType)
+          ? registeredTypes
+          : [currentType].concat(registeredTypes)
+        const badge = getAccountBadge(group, account)
+        const div = document.createElement('div')
+        div.className = 'account'
+        div.dataset.accountIndex = String(accountIndex)
+        div.innerHTML = `
+          <div class="account-status-badge ${badge.className}">${badge.text}</div>
+          <div class="account-row1">
+            <div class="f name">
+              <label>Account name</label>
+              <input type="text" data-k="name" value="${escapeAttr(account.name)}" placeholder="claude-01" />
+            </div>
+            <div class="f type">
+              <label>Provider type</label>
+              <select data-k="type">
+                ${typeOptions
+                  .map(
+                    (typeName) =>
+                      `<option value="${escapeAttr(typeName)}" ${
+                        typeName === currentType ? 'selected' : ''
+                      }>${escapeAttr(typeName)}</option>`
+                  )
+                  .join('')}
+              </select>
+            </div>
+            <div class="f enabled">
+              <label>Enabled</label>
+              <label class="toggle">
+                <input type="checkbox" data-k="enabled" ${account.enabled !== false ? 'checked' : ''} />
+                <span>Accept traffic</span>
+              </label>
+            </div>
+            <div class="f freeze-time">
+              <label>Unfreeze time</label>
+              <input type="text" data-k="unfreeze_at_display" value="${escapeAttr(
+                formatDateTime(account.unfreeze_at)
+              )}" readonly />
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-danger btn-sm">Delete account</button>
+            </div>
+          </div>
+          <div class="account-row2">
+            <div class="f">
+              <label>Auth JSON</label>
+              <textarea data-k="auth" rows="3" placeholder='{"sessionKey": "..."}'>${escapeAttr(
+                authToStr(account.auth)
+              )}</textarea>
+            </div>
+          </div>
+        `
+        div.querySelector('[data-k="name"]').oninput = (event) => onChange(accountIndex, 'name', event.target.value)
+        div.querySelector('[data-k="type"]').onchange = (event) => onChange(accountIndex, 'type', event.target.value)
+        div.querySelector('[data-k="enabled"]').onchange = (event) =>
+          onChange(accountIndex, 'enabled', event.target.checked, true)
+        div.querySelector('[data-k="auth"]').oninput = (event) => onChange(accountIndex, 'auth', event.target.value)
+        div.querySelector('.btn-danger').onclick = () => onRemove(accountIndex)
+        return div
+      }
+
+      function groupKey(group, index) {
+        const host = (group.proxy_host || '').trim()
+        const user = (group.proxy_user || '').trim()
+        return host || user ? `${host}|${user}` : `idx-${index}`
+      }
+
+      function filterConfig(cfg, search) {
+        const query = (search || '').trim().toLowerCase()
+        if (!query) return cfg.map((group, i) => ({ group, groupIndex: i, accountIndices: null }))
+        const result = []
+        cfg.forEach((group, groupIndex) => {
+          const matchHost = (group.proxy_host || '').toLowerCase().includes(query)
+          const matchUser = (group.proxy_user || '').toLowerCase().includes(query)
+          const allAccounts = group.accounts || []
+          const accountIndices = allAccounts
+            .map((_, i) => i)
+            .filter((i) => {
+              const account = allAccounts[i]
+              return (
+                (account.name || '').toLowerCase().includes(query) ||
+                (account.type || '').toLowerCase().includes(query)
+              )
+            })
+          if (matchHost || matchUser || accountIndices.length > 0) {
+            result.push({
+              group,
+              groupIndex,
+              accountIndices: accountIndices.length ? accountIndices : null,
+            })
+          }
+        })
+        return result
+      }
+
+      function renderGroup(
+        group,
+        groupIndex,
+        onRemoveGroup,
+        onAddAccount,
+        onRemoveAccount,
+        onAccountChange,
+        onGroupChange,
+        opts
+      ) {
+        const valueOf = (key, fallback = '') => (group[key] != null && group[key] !== '' ? group[key] : fallback)
+        const useProxy = group.use_proxy !== false
+        const gkey = groupKey(group, groupIndex)
+        const allAccounts = group.accounts || []
+        const indices = opts.accountIndices || allAccounts.map((_, i) => i)
+        const totalCount = indices.length
+        const isCollapsed = groupCollapsed[gkey] === true
+        const pageSize = groupPageSize[gkey] || DEFAULT_PAGE_SIZE
+        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+        const currentPage = Math.min(groupPage[gkey] || 0, totalPages - 1)
+        const start = currentPage * pageSize
+        const pageIndices = indices.slice(start, start + pageSize)
+        const pageAccounts = pageIndices.map((i) => allAccounts[i])
+
+        const div = document.createElement('div')
+        div.className = 'group' + (isCollapsed ? ' collapsed' : '')
+        div.dataset.groupIndex = String(groupIndex)
+        div.innerHTML = `
+          <div class="group-header" data-action="toggle">
+            <div>
+              <h3>
+                <span class="chevron">▼</span>
+                Proxy group ${groupIndex + 1}
+              </h3>
+              <p class="meta">${escapeAttr(
+                useProxy ? group.proxy_host || 'Proxy not set' : 'Direct connection'
+              )} · ${allAccounts.length} accounts</p>
+            </div>
+            <div class="group-actions" onclick="event.stopPropagation()">
+              <button type="button" class="btn btn-sm" data-action="add-account">Add account</button>
+              <button type="button" class="btn btn-danger btn-sm" data-action="remove-group">Delete group</button>
+            </div>
+          </div>
+          <div class="group-body">
+            ${
+              useProxy
+                ? ''
+                : '<div class="warn">This group is using a direct connection. The browser will use this machine\'s own exit IP. Avoid packing many accounts into one direct group.</div>'
+            }
+            <div class="row proxy-one-row">
+              <div>
+                <label>Use proxy</label>
+                <label class="toggle">
+                  <input type="checkbox" data-k="use_proxy" ${useProxy ? 'checked' : ''} />
+                  <span>Use proxy</span>
+                </label>
+              </div>
+              <div>
+                <label>Proxy host</label>
+                <input type="text" data-k="proxy_host" value="${escapeAttr(valueOf('proxy_host'))}" placeholder="sg.arxlabs.io:3010" ${
+                  useProxy ? '' : 'disabled'
+                } />
+              </div>
+              <div>
+                <label>Proxy user</label>
+                <input type="text" data-k="proxy_user" value="${escapeAttr(valueOf('proxy_user'))}" placeholder="Proxy username" ${
+                  useProxy ? '' : 'disabled'
+                } />
+              </div>
+              <div>
+                <label>Proxy password</label>
+                <input type="text" data-k="proxy_pass" value="${escapeAttr(valueOf('proxy_pass'))}" placeholder="Proxy password" ${
+                  useProxy ? '' : 'disabled'
+                } />
+              </div>
+              <div>
+                <label>Fingerprint ID</label>
+                <input type="text" data-k="fingerprint_id" value="${escapeAttr(valueOf('fingerprint_id'))}" placeholder="4567" />
+              </div>
+              <div>
+                <label>Timezone</label>
+                <select data-k="timezone">${(() => {
+                  const value = valueOf('timezone') || 'America/Chicago'
+                  const options = TIMEZONES.includes(value) ? TIMEZONES : [value, ...TIMEZONES].sort()
+                  return options
+                    .map(
+                      (tz) =>
+                        `<option value="${escapeAttr(tz)}" ${tz === value ? 'selected' : ''}>${escapeAttr(tz)}</option>`
+                    )
+                    .join('')
+                })()}</select>
+              </div>
+            </div>
+            <div class="accounts">
+              <div class="accounts-head">
+                <h4>Accounts</h4>
+                <p class="meta">name / type / auth JSON</p>
+              </div>
+              <div class="accounts-list"></div>
+              ${
+                totalPages > 1
+                  ? `
+                  <div class="pagination">
+                    <span class="info">Page ${currentPage + 1} of ${totalPages} · ${totalCount} accounts</span>
+                    <select data-action="page-size">
+                      ${PAGE_SIZE_OPTIONS.map(
+                        (n) => `<option value="${n}" ${n === pageSize ? 'selected' : ''}>${n} / page</option>`
+                      ).join('')}
+                    </select>
+                    <button type="button" class="btn btn-sm" data-action="prev" ${
+                      currentPage <= 0 ? 'disabled' : ''
+                    }>Previous</button>
+                    <button type="button" class="btn btn-sm" data-action="next" ${
+                      currentPage >= totalPages - 1 ? 'disabled' : ''
+                    }>Next</button>
+                  </div>
+                `
+                  : ''
+              }
+            </div>
+          </div>
+        `
+
+        div.querySelector('[data-action="toggle"]').onclick = () => {
+          groupCollapsed[gkey] = !groupCollapsed[gkey]
+          opts.rerender()
+        }
+
+        ;['proxy_host', 'proxy_user', 'proxy_pass', 'fingerprint_id'].forEach((key) => {
+          const element = div.querySelector(`[data-k="${key}"]`)
+          if (element) element.oninput = (event) => onGroupChange(groupIndex, key, event.target.value)
+        })
+
+        const useProxyEl = div.querySelector('[data-k="use_proxy"]')
+        if (useProxyEl) {
+          useProxyEl.onchange = (event) => onGroupChange(groupIndex, 'use_proxy', event.target.checked, true)
+        }
+
+        const timezoneEl = div.querySelector('[data-k="timezone"]')
+        if (timezoneEl) timezoneEl.onchange = (event) => onGroupChange(groupIndex, 'timezone', event.target.value)
+
+        div.querySelector('[data-action="add-account"]').onclick = () => onAddAccount(groupIndex)
+        div.querySelector('[data-action="remove-group"]').onclick = () => onRemoveGroup(groupIndex)
+
+        const pageSizeEl = div.querySelector('[data-action="page-size"]')
+        if (pageSizeEl) {
+          pageSizeEl.onchange = (event) => {
+            groupPageSize[gkey] = Number(event.target.value)
+            groupPage[gkey] = 0
+            opts.rerender()
+          }
+        }
+
+        const prevEl = div.querySelector('[data-action="prev"]')
+        if (prevEl) {
+          prevEl.onclick = () => {
+            if (currentPage > 0) {
+              groupPage[gkey] = currentPage - 1
+              opts.rerender()
+            }
+          }
+        }
+
+        const nextEl = div.querySelector('[data-action="next"]')
+        if (nextEl) {
+          nextEl.onclick = () => {
+            if (currentPage < totalPages - 1) {
+              groupPage[gkey] = currentPage + 1
+              opts.rerender()
+            }
+          }
+        }
+
+        const list = div.querySelector('.accounts-list')
+        pageAccounts.forEach((account, localIndex) => {
+          const globalIndex = pageIndices[localIndex]
+          list.appendChild(
+            renderAccount(
+              account,
+              globalIndex,
+              group,
+              onRemoveAccount.bind(null, groupIndex),
+              onAccountChange.bind(null, groupIndex)
+            )
+          )
+        })
+
+        return div
+      }
+
+      function getConfigFromForm() {
+        return (config || [])
+          .map((group) => ({
+            use_proxy: group.use_proxy !== false,
+            proxy_host: (group.proxy_host || '').trim(),
+            proxy_user: (group.proxy_user || '').trim(),
+            proxy_pass: (group.proxy_pass || '').trim(),
+            fingerprint_id: (group.fingerprint_id || '').trim(),
+            timezone: (group.timezone || '').trim() || undefined,
+            accounts: (group.accounts || [])
+              .map((account) => {
+                const name = (account.name || '').trim()
+                if (!name) return null
+                const normalized = {
+                  name,
+                  type: (account.type || 'claude').trim() || 'claude',
+                  auth: typeof account.auth === 'string' ? parseAuth(account.auth) : account.auth || {},
+                  enabled: account.enabled !== false,
+                }
+                const unfreezeAt = asUnix(account.unfreeze_at)
+                if (unfreezeAt != null) normalized.unfreeze_at = unfreezeAt
+                return normalized
+              })
+              .filter(Boolean),
+          }))
+          .filter((group) => group.accounts.length)
+      }
+
+      function updateAccountStatusBadges() {
+        document.querySelectorAll('.group').forEach((groupEl) => {
+          const groupIndex = Number(groupEl.dataset.groupIndex)
+          const group = config[groupIndex]
+          if (!group) return
+          groupEl.querySelectorAll('.account').forEach((accountEl) => {
+            const accountIndex = Number(accountEl.dataset.accountIndex)
+            const account = (group.accounts || [])[accountIndex]
+            if (!account) return
+            const badge = getAccountBadge(group, account)
+            const badgeEl = accountEl.querySelector('.account-status-badge')
+            if (badgeEl) {
+              badgeEl.className = `account-status-badge ${badge.className}`
+              badgeEl.textContent = badge.text
+            }
+            const unfreezeEl = accountEl.querySelector('[data-k="unfreeze_at_display"]')
+            if (unfreezeEl) {
+              const runtime = runtimeStatus[accountId(group, account)] || null
+              const value = runtime && runtime.unfreeze_at != null ? runtime.unfreeze_at : account.unfreeze_at
+              unfreezeEl.value = formatDateTime(value)
+            }
+          })
+        })
+      }
+
+      function render(configData) {
+        config = JSON.parse(JSON.stringify(configData || []))
+        const searchText = (document.getElementById('search') && document.getElementById('search').value) || ''
+        const filtered = filterConfig(config, searchText)
+        const list = document.getElementById('list')
+        list.innerHTML = ''
+
+        const totalGroups = config.length
+        const totalAccounts = config.reduce((count, group) => count + (group.accounts || []).length, 0)
+        const statsEl = document.getElementById('stats')
+        statsEl.textContent = searchText.trim()
+          ? `${filtered.length} matching groups · ${totalGroups} total groups · ${totalAccounts} accounts`
+          : `${totalGroups} groups · ${totalAccounts} accounts`
+
+        function rerender() {
+          render(config)
+        }
+
+        function onGroupChange(groupIndex, key, value, shouldRerender = false) {
+          if (config[groupIndex]) config[groupIndex][key] = value
+          if (shouldRerender) rerender()
+        }
+
+        function onAddAccount(groupIndex) {
+          if (!config[groupIndex].accounts) config[groupIndex].accounts = []
+          config[groupIndex].accounts.push({
+            name: '',
+            type: 'claude',
+            auth: {},
+            enabled: true,
+            unfreeze_at: null,
+          })
+          rerender()
+        }
+
+        function onRemoveAccount(groupIndex, accountIndex) {
+          config[groupIndex].accounts.splice(accountIndex, 1)
+          rerender()
+        }
+
+        function onAccountChange(groupIndex, accountIndex, key, value) {
+          if (!config[groupIndex].accounts[accountIndex]) return
+          if (key === 'auth') config[groupIndex].accounts[accountIndex].auth = parseAuth(value)
+          else config[groupIndex].accounts[accountIndex][key] = value
+          if (key === 'enabled') rerender()
+        }
+
+        function onRemoveGroup(groupIndex) {
+          config.splice(groupIndex, 1)
+          rerender()
+        }
+
+        if (!filtered.length) {
+          list.innerHTML = '<div class="empty">No groups match the current filter.</div>'
+          return
+        }
+
+        filtered.forEach(({ group, groupIndex, accountIndices }) => {
+          list.appendChild(
+            renderGroup(group, groupIndex, onRemoveGroup, onAddAccount, onRemoveAccount, onAccountChange, onGroupChange, {
+              rerender,
+              accountIndices,
+            })
+          )
+        })
+        updateAccountStatusBadges()
+      }
+
+      async function refreshConfigAndStatus(showLoadedMessage = false) {
+        const [data, status] = await Promise.all([
+          loadConfig(),
+          loadStatus().catch(() => ({ accounts: {}, now: Math.trunc(Date.now() / 1000) })),
+        ])
+        applyRuntimeStatus(status)
+        render(data)
+        if (showLoadedMessage) showMsg('Configuration reloaded.')
+      }
+
+      async function saveAuthSettings() {
+        const button = document.getElementById('saveAuthSettings')
+        if (!authSettings) {
+          showMsg('Auth settings are not loaded yet.', 'error')
+          return
+        }
+        const payload = {}
+        payload.api_key = document.getElementById('globalApiKey').value
+        const password = document.getElementById('globalAdminPassword').value.trim()
+        if (password) payload.admin_password = password
+        if (!Object.keys(payload).length) {
+          showMsg('Nothing to save.')
+          return
+        }
+
+        setButtonBusy(button, true, 'Saving…', 'Save auth settings')
+        try {
+          const res = await apiFetch(AUTH_SETTINGS_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          const parsed = await parseResponse(res)
+          if (!res.ok) {
+            throw new Error((parsed.data && parsed.data.detail) || parsed.text || res.statusText)
+          }
+          renderAuthSettings((parsed.data && parsed.data.settings) || authSettings)
+          document.getElementById('globalAdminPassword').value = ''
+          if (payload.admin_password) {
+            showMsg('Admin password updated. Please sign in again.')
+            setTimeout(() => {
+              window.location.href = '/login'
+            }, 900)
+            return
+          }
+          showMsg('Auth settings saved.')
+        } catch (error) {
+          showMsg((error && error.message) || 'Failed to save auth settings.', 'error')
+        } finally {
+          setButtonBusy(button, false, 'Saving…', 'Save auth settings')
+        }
+      }
+
+      async function disableDashboardPassword() {
+        const button = document.getElementById('clearAdminPassword')
+        if (!authSettings) return
+        const confirmed = window.confirm(
+          'Disable the dashboard password? The config dashboard will no longer require sign-in until a new password is set.'
+        )
+        if (!confirmed) return
+
+        setButtonBusy(button, true, 'Disabling…', 'Disable dashboard password')
+        try {
+          const res = await apiFetch(AUTH_SETTINGS_API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_password: '' }),
+          })
+          const parsed = await parseResponse(res)
+          if (!res.ok) {
+            throw new Error((parsed.data && parsed.data.detail) || parsed.text || res.statusText)
+          }
+          showMsg('Dashboard password disabled. Redirecting…')
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 900)
+        } catch (error) {
+          showMsg((error && error.message) || 'Failed to disable dashboard password.', 'error')
+        } finally {
+          setButtonBusy(button, false, 'Disabling…', 'Disable dashboard password')
+        }
+      }
+
+      document.getElementById('addGroup').onclick = () => {
+        config.push({
+          use_proxy: true,
+          proxy_host: '',
+          proxy_user: '',
+          proxy_pass: '',
+          fingerprint_id: '',
+          timezone: 'America/Chicago',
+          accounts: [{ name: '', type: 'claude', auth: {}, enabled: true, unfreeze_at: null }],
+        })
+        render(config)
+      }
+
+      document.getElementById('load').onclick = async () => {
+        try {
+          await Promise.all([loadTypes(), refreshConfigAndStatus(false)])
+          const [settings, metadata] = await Promise.all([
+            loadAuthSettings().catch(() => null),
+            loadModelMetadata().catch(() => null),
+          ])
+          renderAuthSettings(settings)
+          renderModels(metadata)
+          showMsg('Configuration reloaded.')
+        } catch (error) {
+          showMsg((error && error.message) || 'Failed to reload configuration.', 'error')
+        }
+      }
+
+      document.getElementById('save').onclick = async () => {
+        const toSave = getConfigFromForm()
+        if (!toSave.length) {
+          showMsg('Keep at least one proxy group with at least one account.', 'error')
+          return
+        }
+        const button = document.getElementById('save')
+        setButtonBusy(button, true, 'Saving…', 'Save config')
+        try {
+          const res = await apiFetch(API, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toSave),
+          })
+          const parsed = await parseResponse(res)
+          if (!res.ok) {
+            throw new Error((parsed.data && parsed.data.detail) || parsed.text || res.statusText)
+          }
+          showMsg((parsed.data && parsed.data.message) || 'Configuration saved and applied.')
+          await refreshConfigAndStatus(false)
+        } catch (error) {
+          showMsg((error && error.message) || 'Failed to save configuration.', 'error')
+        } finally {
+          setButtonBusy(button, false, 'Saving…', 'Save config')
+        }
+      }
+
+      document.getElementById('saveAuthSettings').onclick = () => void saveAuthSettings()
+      document.getElementById('clearAdminPassword').onclick = () => void disableDashboardPassword()
+
+      document.getElementById('logout').onclick = async () => {
+        try {
+          await fetch('/api/admin/logout', { method: 'POST' })
+        } catch (_) {}
+        window.location.href = '/login'
+      }
+
+      let searchDebounce
+      document.getElementById('search').oninput = () => {
+        clearTimeout(searchDebounce)
+        searchDebounce = setTimeout(() => render(config), 180)
+      }
+
+      // Pro models toggle
+      async function loadProModels() {
+        try {
+          const res = await apiFetch('/api/config/pro-models')
+          const data = await res.json()
+          const toggle = document.getElementById('proModelsToggle')
+          const status = document.getElementById('proModelsStatus')
+          toggle.checked = !!data.enabled
+          status.textContent = data.enabled ? 'Enabled' : 'Disabled'
+          status.style.color = data.enabled ? '#22c55e' : '#888'
+        } catch (_) {
+          document.getElementById('proModelsStatus').textContent = 'Failed to load'
+        }
+      }
+      document.getElementById('proModelsToggle').onchange = async function () {
+        const enabled = this.checked
+        const status = document.getElementById('proModelsStatus')
+        status.textContent = 'Saving…'
+        try {
+          const res = await apiFetch('/api/config/pro-models', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+          })
+          const data = await res.json()
+          status.textContent = data.enabled ? 'Enabled' : 'Disabled'
+          status.style.color = data.enabled ? '#22c55e' : '#888'
+          showMsg(data.enabled ? 'Pro models enabled.' : 'Pro models disabled.')
+        } catch (e) {
+          this.checked = !enabled
+          status.textContent = 'Error'
+          showMsg('Failed to update Pro models setting.', 'error')
+        }
+      }
+
+      ;(async () => {
+        await loadTypes()
+        try {
+          const [data, status, settings, metadata] = await Promise.all([
+            loadConfig(),
+            loadStatus().catch(() => ({ accounts: {}, now: Math.trunc(Date.now() / 1000) })),
+            loadAuthSettings().catch(() => null),
+            loadModelMetadata().catch(() => null),
+          ])
+          loadProModels().catch(() => null)
+          applyRuntimeStatus(status)
+          renderAuthSettings(settings)
+          renderModels(metadata)
+          render(data)
+        } catch (error) {
+          renderAuthSettings(null)
+          renderModels(null)
+          render([])
+          showMsg((error && error.message) || 'No configuration was loaded yet.', 'error')
+        }
+      })()
+
+      setInterval(async () => {
+        if (document.hidden) return
+        try {
+          applyRuntimeStatus(await loadStatus())
+          updateAccountStatusBadges()
+        } catch (_) {}
+      }, 15000)
+    </script>
+  </body>
+</html>
