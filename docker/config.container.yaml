@@ -63,15 +63,9 @@ claude:
   # Custom API base URL (leave empty to use the default endpoint)
   api_base: ''
   # Model name mapping: public model id -> Claude upstream model id
-  model_mapping:
-    claude-sonnet-4-5: claude-sonnet-4-5
-    claude-sonnet-4.6: claude-sonnet-4-6
-    claude-sonnet-4-5-thinking: claude-sonnet-4-5-thinking
-    claude-sonnet-4-6-thinking: claude-sonnet-4-6-thinking
-    claude-haiku-4-5: claude-haiku-4-5
-    claude-haiku-4-5-thinking: claude-haiku-4-5-thinking
-    claude-opus-4-6: claude-opus-4-6
-    claude-opus-4-6-thinking: claude-opus-4-6-thinking
+  # Defaults are defined in ClaudePlugin.DEFAULT_MODEL_MAPPING.
+  # Override or extend here as needed.
+  model_mapping: {}
 
 mock:
   # Port for the mock server
