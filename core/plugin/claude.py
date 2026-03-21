@@ -193,7 +193,7 @@ class ClaudePlugin(BaseSitePlugin):
 
     type_name = "claude"
     DEFAULT_MODEL_MAPPING = {
-        "claude-sonnet-4.6": "claude-sonnet-4-6",
+        "claude-sonnet-4-6": "claude-sonnet-4-6",
         "claude-sonnet-4-5": "claude-sonnet-4-5",
         "claude-sonnet-4-5-thinking": "claude-sonnet-4-5-thinking",
         "claude-sonnet-4-6-thinking": "claude-sonnet-4-6-thinking",
@@ -211,6 +211,7 @@ class ClaudePlugin(BaseSitePlugin):
     })
     MODEL_ALIASES = {
         "s4": "claude-sonnet-4-6",
+        "claude-sonnet-4.6": "claude-sonnet-4-6",
     }
 
     site = SiteConfig(
