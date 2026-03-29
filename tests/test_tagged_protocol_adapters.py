@@ -99,7 +99,9 @@ class TestTaggedProtocolAdapters(unittest.IsolatedAsyncioTestCase):
             if payload["choices"][0]["finish_reason"] is not None:
                 finish_reason = payload["choices"][0]["finish_reason"]
 
-        self.assertEqual("".join(content_parts), "<think>Analyze</think>Hello <b>world</b>")
+        self.assertEqual(
+            "".join(content_parts), "<think>Analyze</think>Hello <b>world</b>"
+        )
         self.assertEqual(finish_reason, "stop")
 
     async def test_openai_stream_tool_call_stops_on_first_terminal_block(self) -> None:
@@ -152,10 +154,7 @@ class TestTaggedProtocolAdapters(unittest.IsolatedAsyncioTestCase):
         raw_events = [
             OpenAIStreamEvent(
                 type="content_delta",
-                content=(
-                    "<think>Done</think>"
-                    "<final_answer>Hello world</final_answer>"
-                ),
+                content=("<think>Done</think><final_answer>Hello world</final_answer>"),
             )
         ]
 

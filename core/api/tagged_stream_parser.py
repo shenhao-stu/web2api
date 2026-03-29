@@ -243,7 +243,6 @@ class TaggedStreamParser:
                         arguments=tool_call.arguments,
                     )
                 )
-            events.append(self._message_stop_event())
             return events
 
         if tag == "</tool_calls>":
@@ -263,7 +262,6 @@ class TaggedStreamParser:
                         arguments=tool_call.arguments,
                     )
                 )
-            events.append(self._message_stop_event())
             return events
 
         if tag == "<final_answer>":
@@ -284,7 +282,6 @@ class TaggedStreamParser:
             self._state = _State.OUTSIDE
             self._terminal_closed = True
             events.append(TaggedStreamEvent(type="block_end", block_type="text"))
-            events.append(self._message_stop_event())
             return events
 
         if self._state_before_tag in {

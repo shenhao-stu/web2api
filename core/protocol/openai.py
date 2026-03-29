@@ -473,7 +473,10 @@ class OpenAIProtocolAdapter(ProtocolAdapter):
             return out
         if event.type == "message_stop":
             reason = "tool_calls" if event.stop_reason == "tool_use" else "stop"
-            return [self._finish_delta(chat_id, model, created, reason), "data: [DONE]\n\n"]
+            return [
+                self._finish_delta(chat_id, model, created, reason),
+                "data: [DONE]\n\n",
+            ]
         if event.type == "error":
             raise ValueError(event.error or "tagged stream parser error")
         return []

@@ -7,7 +7,7 @@ from core.api.tagged_stream_parser import TaggedStreamParser
 class TestTaggedOutput(unittest.TestCase):
     def test_parse_single_tool_call_with_thinking(self) -> None:
         parsed = parse_tagged_output(
-            '<think>Read file first</think>'
+            "<think>Read file first</think>"
             '<tool_call>{"name":"Read","arguments":{"path":"a.py"}}</tool_call>'
         )
 
@@ -20,7 +20,7 @@ class TestTaggedOutput(unittest.TestCase):
 
     def test_parse_tool_calls_with_thinking(self) -> None:
         parsed = parse_tagged_output(
-            '<think>Read files first</think>'
+            "<think>Read files first</think>"
             '<tool_calls>[{"name":"Read","arguments":{"path":"a.py"}},'
             '{"name":"Read","arguments":{"path":"b.py"}}]</tool_calls>'
         )
@@ -43,9 +43,7 @@ class TestTaggedOutput(unittest.TestCase):
 
     def test_rejects_text_outside_tags(self) -> None:
         with self.assertRaises(TaggedOutputError):
-            parse_tagged_output(
-                "prefix <final_answer>Hello world</final_answer>"
-            )
+            parse_tagged_output("prefix <final_answer>Hello world</final_answer>")
 
     def test_parse_multiple_thinks_and_ignore_trailing_content(self) -> None:
         parsed = parse_tagged_output(
@@ -69,6 +67,7 @@ class TestTaggedOutput(unittest.TestCase):
             '{"name":"Read","arguments":{"path":"b.py"}}]</tool_calls>',
         ]:
             events.extend(parser.feed(chunk))
+        events.extend(parser.finish())
 
         event_types = [event.type for event in events]
         self.assertEqual(
@@ -91,7 +90,6 @@ class TestTaggedOutput(unittest.TestCase):
         self.assertEqual(events[5].arguments, {"path": "b.py"})
         self.assertEqual(events[5].call_index, 1)
         self.assertEqual(events[6].stop_reason, "tool_use")
-        self.assertEqual(parser.finish(), [])
 
     def test_stream_parser_flushes_text_per_chunk(self) -> None:
         parser = TaggedStreamParser()
@@ -108,14 +106,12 @@ class TestTaggedOutput(unittest.TestCase):
         self.assertEqual(first[2].text, "Hello")
         self.assertEqual([event.type for event in second], ["block_delta"])
         self.assertEqual(second[0].text, " world")
-        self.assertEqual([event.type for event in third], ["block_end", "message_stop"])
-        self.assertEqual([], fourth)
+        self.assertEqual([event.type for event in third], ["block_end"])
+        self.assertEqual([event.type for event in fourth], ["message_stop"])
 
     def test_stream_parser_keeps_literal_angle_brackets_in_final_answer(self) -> None:
         parser = TaggedStreamParser()
-        events = parser.feed(
-            "<final_answer>Hello <b>world</b></final_answer>"
-        )
+        events = parser.feed("<final_answer>Hello <b>world</b></final_answer>")
         events.extend(parser.finish())
 
         self.assertEqual(events[0].type, "message_start")
@@ -123,7 +119,9 @@ class TestTaggedOutput(unittest.TestCase):
         self.assertEqual(events[-2].type, "block_end")
         self.assertEqual(events[-1].type, "message_stop")
         self.assertEqual(
-            "".join(event.text or "" for event in events if event.type == "block_delta"),
+            "".join(
+                event.text or "" for event in events if event.type == "block_delta"
+            ),
             "Hello <b>world</b>",
         )
         self.assertEqual(events[-1].stop_reason, "end_turn")
@@ -152,20 +150,28 @@ class TestTaggedOutput(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            [(event.block_type, event.text) for event in events if event.type == "block_delta"],
+            [
+                (event.block_type, event.text)
+                for event in events
+                if event.type == "block_delta"
+            ],
             [("thinking", "one"), ("thinking", "two"), ("text", "done")],
         )
 
     def test_stream_parser_ignores_think_after_terminal(self) -> None:
         parser = TaggedStreamParser()
-        events = parser.feed(
-            "<final_answer>done</final_answer><think>ignored</think>"
-        )
+        events = parser.feed("<final_answer>done</final_answer><think>ignored</think>")
         events.extend(parser.finish())
 
         self.assertEqual(
             [event.type for event in events],
-            ["message_start", "block_start", "block_delta", "block_end", "message_stop"],
+            [
+                "message_start",
+                "block_start",
+                "block_delta",
+                "block_end",
+                "message_stop",
+            ],
         )
         self.assertEqual(events[2].text, "done")
 
