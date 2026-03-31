@@ -1,0 +1,45 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local env (secrets)
+.env
+
+# Debug output (runtime)
+debug/
+
+# macOS
+.DS_Store
+
+# IDE & editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking / linters
+.mypy_cache/
+.ruff_cache/
+
+# Cursor / editor state
+.cursor/
+
+start.sh
+start_mock.sh
+start_cf.sh
+
+db.sqlite3
+docker-data/
+config.local.yaml
