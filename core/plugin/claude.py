@@ -202,10 +202,8 @@ class ClaudePlugin(BaseSitePlugin):
         "claude-opus-4-6": "claude-opus-4-6",
         "claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
     }
-    # Models that require a Claude Pro subscription.
+    # Models that require a Claude Pro subscription (only Opus).
     PRO_MODELS = frozenset({
-        "claude-haiku-4-5",
-        "claude-haiku-4-5-thinking",
         "claude-opus-4-6",
         "claude-opus-4-6-thinking",
     })

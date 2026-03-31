@@ -29,43 +29,12 @@ if [[ $# -gt 0 ]]; then
 fi
 
 cleanup() {
-  if [[ -n "${XRAY_PID:-}" ]]; then
-    kill "${XRAY_PID}" >/dev/null 2>&1 || true
-  fi
   if [[ -n "${XVFB_PID:-}" ]]; then
     kill "${XVFB_PID}" >/dev/null 2>&1 || true
   fi
 }
 
 trap cleanup EXIT INT TERM
-
-# ---- Xray proxy (optional) ----
-# Set WEB2API_XRAY_CONFIG to a base64-encoded xray JSON config to enable.
-XRAY_BIN="/opt/xray/xray"
-XRAY_CONFIG="/tmp/xray-config.json"
-XRAY_PID=""
-
-if [[ -n "${WEB2API_XRAY_CONFIG:-}" ]] && [[ -x "${XRAY_BIN}" ]]; then
-  echo "${WEB2API_XRAY_CONFIG}" | base64 -d > "${XRAY_CONFIG}" 2>/dev/null
-  if [[ -s "${XRAY_CONFIG}" ]]; then
-    "${XRAY_BIN}" run -c "${XRAY_CONFIG}" &
-    XRAY_PID=$!
-    # Wait for xray to start listening
-    for _ in $(seq 1 30); do
-      if command -v ss >/dev/null 2>&1; then
-        ss -tlnp 2>/dev/null | grep -q ":10806 " && break
-      elif command -v netstat >/dev/null 2>&1; then
-        netstat -tlnp 2>/dev/null | grep -q ":10806 " && break
-      else
-        sleep 0.5 && break
-      fi
-      sleep 0.3
-    done
-    echo "Xray proxy started (PID=${XRAY_PID})"
-  else
-    echo "Warning: WEB2API_XRAY_CONFIG decode failed, skipping xray" >&2
-  fi
-fi
 
 # ---- Xvfb virtual display ----
 mkdir -p /tmp/.X11-unix

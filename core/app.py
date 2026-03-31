@@ -3,7 +3,9 @@ FastAPI 应用组装：配置加载、账号池、会话缓存、浏览器管理
 """
 
 import asyncio
+import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -37,6 +39,80 @@ from core.runtime.session_cache import SessionCache
 logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+_ACCOUNTS_ENV_KEY = "WEB2API_ACCOUNTS"
+
+
+def _seed_accounts_from_env(repo) -> bool:
+    """
+    If WEB2API_ACCOUNTS is set and the database has no accounts yet,
+    seed the database with accounts from the environment variable.
+
+    Supported formats:
+      - JSON array: full proxy group config (same as PUT /api/config body)
+      - Simple comma-separated sessionKeys: creates one direct group with N claude accounts
+
+    Returns True if accounts were seeded.
+    """
+    raw = os.environ.get(_ACCOUNTS_ENV_KEY, "").strip()
+    if not raw:
+        return False
+
+    existing = repo.load_groups()
+    if existing and any(g.accounts for g in existing):
+        return False
+
+    # Try JSON format first
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and data:
+            from core.config.repository import _raw_to_groups
+            groups = _raw_to_groups(data)
+            repo.save_groups(groups)
+            total = sum(len(g.accounts) for g in groups)
+            logger.info(
+                "[env-seed] loaded %d accounts from %s (JSON format)",
+                total, _ACCOUNTS_ENV_KEY,
+            )
+            return True
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Fall back to simple comma-separated sessionKeys
+    keys = [k.strip() for k in raw.split(",") if k.strip()]
+    if not keys:
+        return False
+
+    proxy_host = os.environ.get("WEB2API_ACCOUNTS_PROXY_HOST", "").strip()
+    proxy_user = os.environ.get("WEB2API_ACCOUNTS_PROXY_USER", "").strip()
+    proxy_pass = os.environ.get("WEB2API_ACCOUNTS_PROXY_PASS", "").strip()
+    fingerprint_id = os.environ.get("WEB2API_ACCOUNTS_FINGERPRINT", "env-default").strip()
+    use_proxy = bool(proxy_host)
+
+    from core.config.schema import AccountConfig, ProxyGroupConfig
+    accounts = [
+        AccountConfig(
+            name=f"claude-{i + 1}",
+            type="claude",
+            auth={"sessionKey": key},
+        )
+        for i, key in enumerate(keys)
+    ]
+    group = ProxyGroupConfig(
+        proxy_host=proxy_host,
+        proxy_user=proxy_user,
+        proxy_pass=proxy_pass,
+        fingerprint_id=fingerprint_id,
+        use_proxy=use_proxy,
+        timezone=os.environ.get("WEB2API_ACCOUNTS_TIMEZONE"),
+        accounts=accounts,
+    )
+    repo.save_groups([group])
+    logger.info(
+        "[env-seed] loaded %d sessionKeys from %s (comma format, proxy=%s)",
+        len(keys), _ACCOUNTS_ENV_KEY, use_proxy,
+    )
+    return True
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -47,6 +123,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     repo = create_config_repository()
     repo.init_schema()
     ensure_config_secret_hashed(repo)
+    _seed_accounts_from_env(repo)
     app.state.config_repo = repo
     auth_settings = refresh_runtime_auth_settings(app)
     groups = repo.load_groups()

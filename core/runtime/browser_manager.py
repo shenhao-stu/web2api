@@ -296,7 +296,7 @@ class BrowserManager:
             f"--timezone={proxy_key.timezone or TIMEZONE}",
             "--force-webrtc-ip-handling-policy",
             "--webrtc-ip-handling-policy=disable_non_proxied_udp",
-            "--disable-features=AsyncDNS",
+            "--disable-features=AsyncDNS,MediaRouter,TranslateUI",
             "--disable-dev-shm-usage",
             "--no-first-run",
             "--no-default-browser-check",
@@ -307,8 +307,7 @@ class BrowserManager:
             "--disable-component-update",
             "--disable-sync",
             "--disable-translate",
-            "--disable-features=MediaRouter,TranslateUI",
-            "--js-flags=--max-old-space-size=256",
+            "--js-flags=--max-old-space-size=512",
         ]
         proxy_forwarder = None
         if proxy_key.use_proxy:
