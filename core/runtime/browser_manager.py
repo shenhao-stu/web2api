@@ -307,7 +307,7 @@ class BrowserManager:
             "--disable-component-update",
             "--disable-sync",
             "--disable-translate",
-            "--js-flags=--max-old-space-size=256",
+            "--js-flags=--max-old-space-size=512",
         ]
         proxy_forwarder = None
         if proxy_key.use_proxy:

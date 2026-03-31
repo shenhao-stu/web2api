@@ -1173,7 +1173,7 @@ async def stream_completion_via_sse(
     on_http_error: Callable,
     is_terminal_event: Callable[[str], bool] | None = None,
     collect_message_id: list[str] | None = None,
-    first_token_timeout: float = 30.0,
+    first_token_timeout: float = 15.0,
     transport: str = "page_fetch",
     transport_options: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:

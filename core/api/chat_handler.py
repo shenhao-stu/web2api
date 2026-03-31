@@ -910,14 +910,6 @@ class ChatHandler:
                 account_id = self._pool.account_id(target.group, target.account)
                 session_id = target.session_id
                 if session_id is None:
-                    await plugin.ensure_request_ready(
-                        target.context,
-                        target.page,
-                        request_id=request_id,
-                        session_id=None,
-                        phase="create_conversation",
-                        account_id=account_id,
-                    )
                     logger.info(
                         "[chat] create_conversation type=%s proxy=%s account=%s",
                         type_name,
