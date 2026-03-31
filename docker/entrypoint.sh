@@ -29,58 +29,12 @@ if [[ $# -gt 0 ]]; then
 fi
 
 cleanup() {
-  if [[ -n "${XRAY_PID:-}" ]]; then
-    kill "${XRAY_PID}" >/dev/null 2>&1 || true
-  fi
   if [[ -n "${XVFB_PID:-}" ]]; then
     kill "${XVFB_PID}" >/dev/null 2>&1 || true
   fi
 }
 
 trap cleanup EXIT INT TERM
-
-# ---- Xray proxy (optional) ----
-# Set WEB2API_XRAY_CONFIG to a base64-encoded xray JSON config to enable.
-# Xray binary is downloaded at runtime to avoid build-time detection.
-XRAY_BIN="/opt/xray/xray"
-XRAY_CONFIG="/tmp/xray-config.json"
-XRAY_PID=""
-
-if [[ -n "${WEB2API_XRAY_CONFIG:-}" ]]; then
-  echo "${WEB2API_XRAY_CONFIG}" | base64 -d > "${XRAY_CONFIG}" 2>/dev/null
-  if [[ -s "${XRAY_CONFIG}" ]]; then
-    # Download xray if not present
-    if [[ ! -x "${XRAY_BIN}" ]]; then
-      XRAY_VER="${WEB2API_XRAY_VERSION:-v25.3.6}"
-      XRAY_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
-      case "${XRAY_ARCH}" in
-        amd64|x86_64) XRAY_FILE="Xray-linux-64.zip" ;;
-        arm64|aarch64) XRAY_FILE="Xray-linux-arm64-v8a.zip" ;;
-        *) echo "Xray: unsupported arch ${XRAY_ARCH}" >&2; XRAY_FILE="" ;;
-      esac
-      if [[ -n "${XRAY_FILE}" ]]; then
-        echo "Downloading xray ${XRAY_VER}..."
-        mkdir -p /opt/xray
-        curl -sL --fail --retry 3 \
-          "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VER}/${XRAY_FILE}" \
-          -o /tmp/xray.zip && \
-        unzip -qo /tmp/xray.zip -d /opt/xray && \
-        chmod +x "${XRAY_BIN}" && \
-        rm -f /tmp/xray.zip
-      fi
-    fi
-    if [[ -x "${XRAY_BIN}" ]]; then
-      "${XRAY_BIN}" run -c "${XRAY_CONFIG}" &
-      XRAY_PID=$!
-      sleep 2
-      echo "Xray proxy started (PID=${XRAY_PID})"
-    else
-      echo "Warning: xray binary not available, skipping proxy" >&2
-    fi
-  else
-    echo "Warning: WEB2API_XRAY_CONFIG decode failed, skipping xray" >&2
-  fi
-fi
 
 # ---- Xvfb virtual display ----
 mkdir -p /tmp/.X11-unix
