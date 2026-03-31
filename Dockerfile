@@ -94,24 +94,6 @@ RUN set -eux; \
         ;; \
     esac
 
-# Install xray-core for VMess/VLESS proxy support (amd64 only for HF Spaces)
-ARG XRAY_VERSION="v25.3.6"
-RUN set -eux; \
-    arch="${TARGETARCH:-}"; \
-    if [ -z "${arch}" ]; then arch="$(dpkg --print-architecture)"; fi; \
-    case "${arch}" in \
-      amd64|x86_64) xray_file="Xray-linux-64.zip" ;; \
-      arm64|aarch64) xray_file="Xray-linux-arm64-v8a.zip" ;; \
-      *) echo "Xray: unsupported arch ${arch}, skipping" >&2; exit 0 ;; \
-    esac; \
-    curl -L --fail --retry 3 --retry-delay 3 \
-      "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${xray_file}" \
-      -o /tmp/xray.zip; \
-    mkdir -p /opt/xray; \
-    unzip -o /tmp/xray.zip -d /opt/xray; \
-    chmod +x /opt/xray/xray; \
-    rm -f /tmp/xray.zip
-
 COPY pyproject.toml /tmp/pyproject.toml
 RUN python - <<'PY'
 import subprocess
