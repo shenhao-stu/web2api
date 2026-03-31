@@ -312,27 +312,32 @@ class BrowserManager:
         ]
         proxy_forwarder = None
         if proxy_key.use_proxy:
-            from core.runtime.local_proxy_forwarder import (
-                LocalProxyForwarder,
-                UpstreamProxy,
-                parse_proxy_server,
-            )
+            if proxy_key.proxy_user:
+                # Upstream HTTP proxy with Basic auth — use local forwarder
+                from core.runtime.local_proxy_forwarder import (
+                    LocalProxyForwarder,
+                    UpstreamProxy,
+                    parse_proxy_server,
+                )
 
-            upstream_host, upstream_port = parse_proxy_server(proxy_key.proxy_host)
-            upstream = UpstreamProxy(
-                host=upstream_host,
-                port=upstream_port,
-                username=proxy_key.proxy_user,
-                password=proxy_pass,
-            )
-            proxy_forwarder = LocalProxyForwarder(
-                upstream,
-                listen_host="127.0.0.1",
-                listen_port=0,
-                on_log=lambda msg: logger.debug("[proxy] %s", msg),
-            )
-            proxy_forwarder.start()
-            args.append(f"--proxy-server={proxy_forwarder.proxy_url}")
+                upstream_host, upstream_port = parse_proxy_server(proxy_key.proxy_host)
+                upstream = UpstreamProxy(
+                    host=upstream_host,
+                    port=upstream_port,
+                    username=proxy_key.proxy_user,
+                    password=proxy_pass,
+                )
+                proxy_forwarder = LocalProxyForwarder(
+                    upstream,
+                    listen_host="127.0.0.1",
+                    listen_port=0,
+                    on_log=lambda msg: logger.debug("[proxy] %s", msg),
+                )
+                proxy_forwarder.start()
+                args.append(f"--proxy-server={proxy_forwarder.proxy_url}")
+            else:
+                # Direct proxy without auth (e.g. local xray socks5/http)
+                args.append(f"--proxy-server={proxy_key.proxy_host}")
         if self._headless:
             args.extend(
                 [
