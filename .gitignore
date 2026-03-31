@@ -36,6 +36,9 @@ htmlcov/
 # Cursor / editor state
 .cursor/
 
+# Claude Code state
+.claude/
+
 start.sh
 start_mock.sh
 start_cf.sh
