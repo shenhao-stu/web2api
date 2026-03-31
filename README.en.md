@@ -102,7 +102,7 @@ uv run python main.py
 **Send your first request:**
 
 ```bash
-curl -s "http://127.0.0.1:9000/claude/v1/chat/completions" \
+curl -s "http://127.0.0.1:9000/openai/claude/v1/chat/completions" \
   -H "Authorization: Bearer your-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"model": "s4", "stream": false, "messages": [{"role":"user","content":"Hello"}]}'
@@ -121,6 +121,29 @@ The project appends the session ID using **zero‑width characters** at the end 
 **Why not just wrap HTTP APIs directly?** Because login state, front‑end protocol, risk control, and session reuse all depend on a **real browser environment**. See [docs/faq.md](docs/faq.md) for details.
 
 ## API examples
+
+### Protocol routes
+
+`{provider}` maps to account `type` in config (for example `claude`).
+
+- OpenAI protocol
+  - `GET /openai/{provider}/v1/models`
+  - `POST /openai/{provider}/v1/chat/completions`
+- Anthropic protocol
+  - `GET /anthropic/{provider}/v1/models`
+  - `GET /anthropic/{provider}/v1/models/{model_id}`
+  - `POST /anthropic/{provider}/v1/messages`
+
+Config-related routes:
+
+- `GET /login`
+- `GET /config`
+- `GET /api/types`
+- `GET /api/config`
+- `GET /api/config/status`
+- `PUT /api/config`
+- `POST /api/admin/login`
+- `POST /api/admin/logout`
 
 More examples can be found in [docs/request_samples/all_api_curl_tests.sh](docs/request_samples/all_api_curl_tests.sh).
 

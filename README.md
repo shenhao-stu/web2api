@@ -72,7 +72,7 @@ uv run python main.py
 **发第一条请求：**
 
 ```bash
-curl -s "http://127.0.0.1:9000/claude/v1/chat/completions" \
+curl -s "http://127.0.0.1:9000/openai/claude/v1/chat/completions" \
   -H "Authorization: Bearer your-secret-key" \
   -H "Content-Type: application/json" \
   -d '{"model": "s4", "stream": false, "messages": [{"role":"user","content":"你好"}]}'
@@ -91,6 +91,29 @@ curl -s "http://127.0.0.1:9000/claude/v1/chat/completions" \
 **为什么不直接封装网络包？** 因为登录态、前端协议、风控、会话复用都依赖真实浏览器环境。详见 [docs/faq.md](docs/faq.md)。
 
 ## API 示例
+
+### 协议路由
+
+`{provider}` 对应配置里的账号 `type`（例如 `claude`）。
+
+- OpenAI 协议
+  - `GET /openai/{provider}/v1/models`
+  - `POST /openai/{provider}/v1/chat/completions`
+- Anthropic 协议
+  - `GET /anthropic/{provider}/v1/models`
+  - `GET /anthropic/{provider}/v1/models/{model_id}`
+  - `POST /anthropic/{provider}/v1/messages`
+
+配置相关路由：
+
+- `GET /login`
+- `GET /config`
+- `GET /api/types`
+- `GET /api/config`
+- `GET /api/config/status`
+- `PUT /api/config`
+- `POST /api/admin/login`
+- `POST /api/admin/logout`
 
 更多示例见 [docs/request_samples/all_api_curl_tests.sh](docs/request_samples/all_api_curl_tests.sh)。
 
